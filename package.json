@@ -1,0 +1,12 @@
+{
+  "name": "senakumagames",
+  "private": true,
+  "workspaces": [
+    "games/*"
+  ],
+  "scripts": {
+    "dev": "npm --workspace runner-2d run dev",
+    "build": "npm --workspace runner-2d run build",
+    "preview": "npm --workspace runner-2d run preview"
+  }
+}
