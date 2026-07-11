@@ -21,6 +21,9 @@ export class BootScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.load.image('player', 'assets/player.png');
+    this.load.image('player_jump', 'assets/player_jump.png');
+    this.load.image('player_hit', 'assets/player_hit.png');
+    this.load.image('player_happy', 'assets/player_happy.png');
     this.load.image('potato', 'assets/potato.png');
     this.load.image('rock', 'assets/rock.png');
     this.load.image('cloud', 'assets/cloud.png');

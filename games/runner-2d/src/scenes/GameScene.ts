@@ -107,6 +107,7 @@ export class GameScene extends Phaser.Scene {
     if (this.jumpsLeft <= 0) return;
     this.jumpsLeft -= 1;
     this.player.setVelocityY(JUMP_VELOCITY);
+    this.player.setTexture('player_jump');
     // ジャンプの「ぷにっ」とした伸び
     this.tweens.add({
       targets: this.player,
@@ -188,6 +189,7 @@ export class GameScene extends Phaser.Scene {
     if (this.isOver) return;
     this.isOver = true;
     this.spawnTimer?.remove();
+    this.player.setTexture('player_hit');
     this.physics.pause();
     this.cameras.main.shake(250, 0.012);
     this.cameras.main.flash(200, 255, 160, 160);
@@ -219,6 +221,7 @@ export class GameScene extends Phaser.Scene {
     const body = this.player.body as Phaser.Physics.Arcade.Body;
     if (body.blocked.down) {
       this.jumpsLeft = 2;
+      if (this.player.texture.key !== 'player') this.player.setTexture('player'); // 着地で表情を戻す
       // 走りの「ゆらゆら」（切り抜き1枚でもそれっぽく見せる）
       this.player.angle = Math.sin(time / 90) * 4;
     } else {

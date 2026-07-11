@@ -22,15 +22,20 @@ npm run build    # 本番ビルド（games/runner-2d/dist/）
 
 ## キャラクター画像の差し替え
 
-現在のプレイヤーはプレースホルダー（仮のクマ）です。せなくまさんの
-イラスト切り抜きに差し替えるには、透過PNGを1枚用意して:
+現在のプレイヤーはサムネイルを参照した**描き起こしスプライト**
+（`tools/make_senakuma_sprite.py` で生成）です。本物のイラスト切り抜きに
+差し替えるには、透過PNGを用意して `games/runner-2d/public/assets/` の
+以下のファイルを置き換えるだけで反映されます（縦横比は自動調整）:
 
-```bash
-cp 切り抜き画像.png games/runner-2d/public/assets/player.png
-```
+| ファイル | 使われる場面 |
+|---|---|
+| `player.png` | 通常（走り・タイトル） |
+| `player_jump.png` | ジャンプ中（ウインク） |
+| `player_hit.png` | 岩にぶつかった時（びっくり） |
+| `player_happy.png` | リザルト画面（笑顔） |
 
-だけでゲーム全体に反映されます（縦横比は自動調整）。切り抜きの作り方は
-[tools/README.md](./tools/README.md) を参照。
+表情差分が1枚しかない場合は、同じ画像を4ファイルにコピーすればOK。
+切り抜きの作り方は [tools/README.md](./tools/README.md) を参照。
 
 > キャラクター画像は権利者（せなくまさん）の許諾を得て使用します。素材を追加する際は
 > `assets/raw/sources.txt` に出典を記録してください（詳細は GAME_PLAN.md セクション2参照）。
