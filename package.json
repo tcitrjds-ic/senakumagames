@@ -10,5 +10,8 @@
     "build": "npm --workspace runner-2d run build && npm --workspace mancala run build",
     "preview": "npm --workspace runner-2d run preview",
     "preview:mancala": "npm --workspace mancala run preview"
+  },
+  "dependencies": {
+    "@fontsource/m-plus-rounded-1c": "^5.2.10"
   }
 }
