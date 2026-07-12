@@ -7,7 +7,7 @@ import {
   loadHighScore,
 } from '../constants';
 import { AudioBox, addMuteButton } from '../audio';
-import { buildBackground, pillButton } from '../ui';
+import { buildBackground, pillButton, fadeStart } from '../ui';
 
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -16,7 +16,22 @@ export class TitleScene extends Phaser.Scene {
 
   create(): void {
     buildBackground(this);
+    this.cameras.main.fadeIn(280, 255, 238, 245);
 
+    // タイトルのアンビエント: ポテトがゆっくり降る
+    this.add.particles(0, 0, 'potato', {
+      x: { min: 0, max: GAME_WIDTH },
+      y: -40,
+      speedY: { min: 35, max: 70 },
+      speedX: { min: -12, max: 12 },
+      scale: { min: 0.14, max: 0.22 },
+      alpha: 0.55,
+      rotate: { min: -40, max: 40 },
+      lifespan: 12000,
+      frequency: 900,
+    });
+
+    this.add.image(GAME_WIDTH / 2, FLOOR_TOP + 8, 'shadow').setAlpha(0.4);
     const player = this.add.image(GAME_WIDTH / 2, FLOOR_TOP - PLAYER_HEIGHT / 2 + 4, 'player');
     player.setScale(PLAYER_HEIGHT / player.height);
     this.tweens.add({
@@ -29,20 +44,34 @@ export class TitleScene extends Phaser.Scene {
       ease: 'Sine.easeInOut',
     });
 
-    // ロゴ（影 + 本体 + ポテト）
-    const logoShadow = this.add
-      .text(GAME_WIDTH / 2 + 4, 176, 'せなくまラン', {
-        fontFamily: FONT_FAMILY, fontSize: '84px', fontStyle: 'bold', color: '#00000022',
-      })
-      .setOrigin(0.5);
-    const logo = this.add
-      .text(GAME_WIDTH / 2, 170, 'せなくまラン', {
-        fontFamily: FONT_FAMILY, fontSize: '84px', fontStyle: 'bold', color: '#ff8fa8',
-      })
-      .setOrigin(0.5)
-      .setStroke('#ffffff', 14)
-      .setShadow(0, 5, '#d4607a55', 8, false, true);
-    const logoPotato = this.add.image(GAME_WIDTH / 2 + 292, 148, 'potato').setScale(0.62).setAngle(14);
+    // デザインロゴ: 1文字ずつ色を変えてアーチ状に並べ、波打たせる
+    const chars = ['せ', 'な', 'く', 'ま', 'ラ', 'ン'];
+    const colors = ['#ff8fa8', '#ffb85c', '#8fd177', '#7ec3f0', '#c39bf0', '#ff8fa8'];
+    const spacing = 88;
+    const startX = GAME_WIDTH / 2 - (spacing * (chars.length - 1)) / 2;
+    chars.forEach((ch, i) => {
+      const arcY = 170 - Math.sin((i / (chars.length - 1)) * Math.PI) * 16;
+      const t = this.add
+        .text(startX + i * spacing, arcY, ch, {
+          fontFamily: FONT_FAMILY, fontSize: '86px', fontStyle: 'bold', color: colors[i],
+        })
+        .setOrigin(0.5)
+        .setStroke('#ffffff', 14)
+        .setShadow(0, 6, '#d4607a44', 6, false, true)
+        .setAngle(i % 2 === 0 ? -3 : 3)
+        .setScale(0);
+      this.tweens.add({ targets: t, scale: 1, duration: 420, delay: i * 60, ease: 'Back.easeOut' });
+      this.tweens.add({
+        targets: t,
+        y: arcY - 8,
+        duration: 900,
+        delay: i * 120,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+    });
+    const logoPotato = this.add.image(GAME_WIDTH / 2 + 296, 136, 'potato').setScale(0.6).setAngle(14);
     this.tweens.add({
       targets: logoPotato,
       angle: 26,
@@ -51,8 +80,6 @@ export class TitleScene extends Phaser.Scene {
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
-    for (const t of [logo, logoShadow]) t.setScale(0);
-    this.tweens.add({ targets: [logo, logoShadow], scale: 1, duration: 450, ease: 'Back.easeOut' });
 
     this.add
       .text(GAME_WIDTH / 2, 236, '— ポテトをあつめて はしりつづけよう —', {
@@ -63,7 +90,7 @@ export class TitleScene extends Phaser.Scene {
 
     const start = (): void => {
       AudioBox.startMusic();
-      this.scene.start('Game');
+      fadeStart(this, 'Game');
     };
     pillButton(this, GAME_WIDTH / 2, 318, 340, 72, 'タップで スタート！', start);
     this.input.keyboard?.once('keydown-SPACE', () => {

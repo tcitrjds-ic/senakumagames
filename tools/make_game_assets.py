@@ -209,6 +209,67 @@ def make_rock() -> None:
     save(img, RUNNER / "rock.png")
 
 
+def make_bird() -> None:
+    """羽ばたき2フレームのとり（ステッカー調）"""
+    for name, wing_up in [("bird1", True), ("bird2", False)]:
+        img = Image.new("RGBA", (400, 340), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        body = (126, 195, 240, 255)
+        belly = (235, 248, 255, 255)
+        wing = (86, 160, 214, 255)
+        ellipse(d, 200, 190, 130, 105, body)                     # 体
+        ellipse(d, 210, 235, 88, 55, belly)                      # おなか
+        # しっぽ
+        d.polygon([(75, 175), (18, 140), (30, 205)], fill=wing)
+        # 羽（上/下）
+        if wing_up:
+            d.polygon([(150, 165), (95, 55), (215, 120)], fill=wing)
+            d.polygon([(150, 168), (130, 80), (230, 135)], fill=(106, 178, 228, 255))
+        else:
+            d.polygon([(150, 200), (100, 295), (225, 240)], fill=wing)
+            d.polygon([(150, 200), (135, 275), (235, 232)], fill=(106, 178, 228, 255))
+        # くちばしと目
+        d.polygon([(320, 175), (372, 190), (320, 210)], fill=(255, 176, 82, 255))
+        ellipse(d, 282, 165, 17, 19, (70, 46, 34, 255))
+        ellipse(d, 288, 158, 6, 6, (255, 255, 255, 255))
+        ellipse(d, 250, 220, 20, 12, (255, 170, 190, 160))       # ほっぺ
+        out = sticker(img, outline=13)
+        out = out.resize((104, 92), Image.LANCZOS)
+        save(out, RUNNER / f"{name}.png")
+
+
+def make_flowers() -> None:
+    """草地のかざり用の花（2色）"""
+    for name, petal, center in [
+        ("flower1", (255, 159, 180, 255), (255, 236, 150, 255)),
+        ("flower2", (255, 216, 106, 255), (255, 250, 230, 255)),
+    ]:
+        img = Image.new("RGBA", (200, 260), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        d.rounded_rectangle((92, 120, 108, 250), radius=8, fill=(109, 179, 95, 255))
+        ellipse(d, 68, 190, 34, 16, (120, 190, 100, 255))
+        ellipse(d, 132, 215, 34, 16, (120, 190, 100, 255))
+        for k in range(6):
+            a = math.pi / 3 * k
+            ellipse(d, 100 + 42 * math.cos(a), 78 + 42 * math.sin(a), 30, 30, petal)
+        ellipse(d, 100, 78, 26, 26, center)
+        out = sticker(img, outline=10, shadow=(3, 5), sh_alpha=55)
+        out = out.resize((56, 72), Image.LANCZOS)
+        save(out, RUNNER / f"{name}.png")
+
+
+def make_shadow() -> None:
+    """接地影（やわらかい黒楕円）"""
+    S = 256
+    img = Image.new("RGBA", (S, S // 2), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    for r in range(100, 0, -2):
+        a = round(95 * (1 - r / 100) ** 1.3)
+        ellipse(d, S / 2, S / 4, r * 1.22, r * 0.5, (40, 24, 16, a))
+    img = img.resize((128, 64), Image.LANCZOS)
+    save(img, RUNNER / "shadow.png")
+
+
 def make_particles() -> None:
     # きらきら星
     S = 128
@@ -307,6 +368,9 @@ if __name__ == "__main__":
     make_ground()
     make_potato()
     make_rock()
+    make_bird()
+    make_flowers()
+    make_shadow()
     make_particles()
     make_board()
     make_glow()

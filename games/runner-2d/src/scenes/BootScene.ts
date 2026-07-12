@@ -36,6 +36,11 @@ export class BootScene extends Phaser.Scene {
     this.load.image('ground', 'assets/ground.png');
     this.load.image('potato', 'assets/potato.png');
     this.load.image('rock', 'assets/rock.png');
+    this.load.image('bird1', 'assets/bird1.png');
+    this.load.image('bird2', 'assets/bird2.png');
+    this.load.image('flower1', 'assets/flower1.png');
+    this.load.image('flower2', 'assets/flower2.png');
+    this.load.image('shadow', 'assets/shadow.png');
     this.load.image('sparkle', 'assets/sparkle.png');
     this.load.image('dust', 'assets/dust.png');
     this.load.image('player', 'assets/player.png');

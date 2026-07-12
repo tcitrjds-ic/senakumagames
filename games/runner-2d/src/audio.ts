@@ -49,6 +49,13 @@ class AudioBoxImpl {
     osc.stop(t + dur + 0.05);
   }
 
+  /** コイン音。コンボが続くほど音程が上がる */
+  coin(step = 0): void {
+    const f = 880 * Math.pow(2, Math.min(step, 16) / 24);
+    this.tone(f, 0.09, 'square', 0.05);
+    this.tone(f * 1.5, 0.14, 'square', 0.05, 0.07);
+  }
+
   play(name: SfxName): void {
     switch (name) {
       case 'jump': this.tone(320, 0.16, 'square', 0.045, 0, 660); break;

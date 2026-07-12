@@ -65,6 +65,14 @@ export function pillButton(
   return c;
 }
 
+/** フェードアウトしてからシーンを切り替える（ぶつ切り遷移をなくす） */
+export function fadeStart(scene: Phaser.Scene, key: string, data?: object): void {
+  scene.cameras.main.fadeOut(240, 255, 238, 245);
+  scene.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+    scene.scene.start(key, data);
+  });
+}
+
 /** HUD用の白い半透明ピル */
 export function hudPill(scene: Phaser.Scene, x: number, y: number, w: number, h: number): void {
   const g = scene.add.graphics().setDepth(9);

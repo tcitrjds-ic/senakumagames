@@ -62,6 +62,8 @@ export class GameScene extends Phaser.Scene {
   private over = false;
   private hovered = -1;
   private pulse = { v: 0 };
+  private aiLevel: 0 | 1 | 2 = 1; // よわい / ふつう / つよい
+  private cpuMarker?: Phaser.GameObjects.Image;
 
   private pitZones: Phaser.GameObjects.Ellipse[] = [];
   private glows: Phaser.GameObjects.Image[] = [];
@@ -101,6 +103,7 @@ export class GameScene extends Phaser.Scene {
     this.countLabels = [];
 
     this.add.image(W / 2, H / 2, 'bg').setDisplaySize(W, H);
+    this.cameras.main.fadeIn(280, 255, 238, 245);
     this.buildBoard();
     this.buildHeader();
     this.sparkles = this.add.particles(0, 0, 'sparkle', {
@@ -203,7 +206,7 @@ export class GameScene extends Phaser.Scene {
         fontFamily: FONT,
         fontSize: '21px',
         color: '#6b4632',
-        wordWrap: { width: 412 },
+        wordWrap: { width: 412, useAdvancedWrap: true },
         lineSpacing: 6,
       })
       .setOrigin(0, 0.5)
@@ -292,35 +295,78 @@ export class GameScene extends Phaser.Scene {
     items.push(logo, logoShadow);
 
     const panel = this.add.graphics().setDepth(51);
-    panel.fillStyle(0xfffdf8, 0.97).fillRoundedRect(150, 150, 660, 250, 24);
-    panel.lineStyle(4, 0xf0b7c8).strokeRoundedRect(150, 150, 660, 250, 24);
+    panel.fillStyle(0xfffdf8, 0.97).fillRoundedRect(150, 142, 660, 216, 24);
+    panel.lineStyle(4, 0xf0b7c8).strokeRoundedRect(150, 142, 660, 216, 24);
     items.push(panel);
     const rules = [
       '🍟 じぶんの列（した）のくぼみをタップして、ポテトを反時計まわりに1つずつまく',
       '🍟 さいごの1つが みぎのゴールに入ったら もういっかい！',
-      '🍟 さいごの1つが じぶんの空きマスに入ったら、向かいのポテトを横取り！',
+      '🍟 さいごの1つが じぶんの空きマスなら、向かいのポテトを横取り！',
       '🍟 ゴールのポテトが多いほうの勝ち！',
     ].join('\n\n');
     items.push(
       this.add
-        .text(180, 275, rules, {
-          fontFamily: FONT, fontSize: '19px', color: '#6b4632',
-          wordWrap: { width: 600 }, lineSpacing: 3,
+        .text(178, 250, rules, {
+          fontFamily: FONT, fontSize: '17px', color: '#6b4632',
+          wordWrap: { width: 604, useAdvancedWrap: true }, lineSpacing: 2,
         })
         .setOrigin(0, 0.5).setDepth(52),
     );
+
+    // つよさ選択
+    items.push(
+      this.add
+        .text(258, 392, 'せなくまの つよさ：', { fontFamily: FONT, fontSize: '19px', fontStyle: 'bold', color: '#ffffff' })
+        .setOrigin(1, 0.5).setStroke('#8a5a44', 6).setDepth(52),
+    );
+    const levels: { label: string; v: 0 | 1 | 2 }[] = [
+      { label: 'よわい', v: 0 },
+      { label: 'ふつう', v: 1 },
+      { label: 'つよい', v: 2 },
+    ];
+    const chips: Phaser.GameObjects.Container[] = [];
+    const renderChips = (): void => {
+      chips.forEach((c) => c.destroy());
+      chips.length = 0;
+      levels.forEach((lv, i) => {
+        const x = 330 + i * 130;
+        const selected = this.aiLevel === lv.v;
+        const chip = this.add.container(x, 392).setDepth(52);
+        const g = this.add.graphics();
+        g.fillStyle(selected ? 0xff8fa8 : 0xffffff, 1).fillRoundedRect(-56, -22, 112, 44, 22);
+        g.lineStyle(3, selected ? 0xe07a90 : 0xe8cdd6).strokeRoundedRect(-56, -22, 112, 44, 22);
+        const t = this.add
+          .text(0, 0, lv.label, {
+            fontFamily: FONT, fontSize: '19px', fontStyle: 'bold',
+            color: selected ? '#ffffff' : '#a97c8c',
+          })
+          .setOrigin(0.5);
+        chip.add([g, t]);
+        chip.setSize(112, 44);
+        chip.setInteractive({ useHandCursor: true });
+        chip.on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, e: Phaser.Types.Input.EventData) => {
+          e.stopPropagation();
+          AudioBox.play('click');
+          this.aiLevel = lv.v;
+          renderChips();
+        });
+        chips.push(chip);
+        items.push(chip);
+      });
+    };
+    renderChips();
 
     let begun = false;
     const begin = (): void => {
       if (begun) return;
       begun = true;
       items.forEach((o) => o.destroy());
+      chips.forEach((c) => c.destroy());
       btn.destroy();
       AudioBox.startMusic();
       this.startPlayerTurn('きみが先手だよ！すきなくぼみを タップしてね');
     };
-    const btn = pillButton(this, W / 2, 462, 320, 66, 'あそぶ！', begin);
-    this.input.once('pointerdown', begin);
+    const btn = pillButton(this, W / 2, 472, 300, 62, 'あそぶ！', begin);
   }
 
   private startPlayerTurn(message: string): void {
@@ -333,6 +379,8 @@ export class GameScene extends Phaser.Scene {
     if (this.busy || this.over || this.board[i] === 0) return;
     this.busy = true;
     this.setTurnBanner('', undefined);
+    this.cpuMarker?.destroy();
+    this.cpuMarker = undefined;
     AudioBox.play('click');
     this.playMove(i, 'player');
   }
@@ -371,6 +419,16 @@ export class GameScene extends Phaser.Scene {
               duration: 120,
               ease: 'Sine.easeOut',
             });
+            if (target === P_STORE || target === C_STORE) {
+              // ゴールに入った時だけ、きらっと光らせて数字を弾ませる
+              this.sparkles.explode(6, dst.x, dst.y);
+              this.tweens.add({
+                targets: this.countLabels[target],
+                scale: { from: 1.5, to: 1 },
+                duration: 220,
+                ease: 'Back.easeOut',
+              });
+            }
           },
         });
       });
@@ -426,29 +484,60 @@ export class GameScene extends Phaser.Scene {
     this.setTurnBanner('せなくまのばん…', 0xe07a90);
     this.say('んー、どこにしようかな…');
 
+    this.cpuMarker?.destroy();
+    this.cpuMarker = undefined;
     this.time.delayedCall(1000, () => {
       const pit = this.chooseCpuMove();
       const pos = this.pitPos(pit);
-      const marker = this.add.image(pos.x, pos.y, 'glow').setDepth(3).setAlpha(0.85).setScale(0.72);
+      const marker = this.add.image(pos.x, pos.y, 'glow').setDepth(3).setAlpha(0.9).setScale(0.72);
       this.say('ここ！');
       this.time.delayedCall(500, () => {
-        marker.destroy();
+        marker.setAlpha(0.35); // どこを選んだか、次の自分の手番まで薄く残す
+        this.cpuMarker = marker;
         this.playMove(pit, 'cpu');
       });
     });
   }
 
   private chooseCpuMove(): number {
-    const candidates: { pit: number; score: number }[] = [];
+    const options: { pit: number; r: MoveResult }[] = [];
     for (let pit = 7; pit <= 12; pit++) {
       if (this.board[pit] === 0) continue;
-      const r = computeMove(this.board, pit, 'cpu');
-      const storeGain = r.board[C_STORE] - this.board[C_STORE];
-      const score = (r.extraTurn ? 100 : 0) + r.captured * 10 + storeGain + Math.random();
-      candidates.push({ pit, score });
+      options.push({ pit, r: computeMove(this.board, pit, 'cpu') });
     }
-    candidates.sort((a, b) => b.score - a.score);
-    return candidates[0].pit;
+
+    // よわい: 基本ランダム（ときどきだけ「もういっかい」に気づく）
+    if (this.aiLevel === 0) {
+      if (Math.random() < 0.3) {
+        const et = options.find((o) => o.r.extraTurn);
+        if (et) return et.pit;
+      }
+      return Phaser.Math.RND.pick(options).pit;
+    }
+
+    // ふつう: 1手の利得だけ見る貪欲法
+    const greedy = (o: { r: MoveResult }): number =>
+      (o.r.extraTurn ? 100 : 0) + o.r.captured * 10 + (o.r.board[C_STORE] - this.board[C_STORE]) + Math.random();
+    if (this.aiLevel === 1) {
+      return options.sort((a, b) => greedy(b) - greedy(a))[0].pit;
+    }
+
+    // つよい: 相手の最善応手（貪欲）まで読んで差し引きで評価
+    const deep = (o: { r: MoveResult }): number => {
+      let s = (o.r.board[C_STORE] - this.board[C_STORE]) * 3 + (o.r.extraTurn ? 6 : 0);
+      if (!o.r.extraTurn) {
+        let bestReply = 0;
+        for (let p = 0; p <= 5; p++) {
+          if (o.r.board[p] === 0) continue;
+          const rr = computeMove(o.r.board, p, 'player');
+          const gain = rr.board[P_STORE] - o.r.board[P_STORE] + (rr.extraTurn ? 4 : 0);
+          bestReply = Math.max(bestReply, gain);
+        }
+        s -= bestReply * 2.5;
+      }
+      return s + Math.random() * 0.5;
+    };
+    return options.sort((a, b) => deep(b) - deep(a))[0].pit;
   }
 
   /** どちらかの列が空になったら残りを各自のゴールへ集めて終了 */
@@ -538,9 +627,13 @@ export class GameScene extends Phaser.Scene {
       this.time.delayedCall(2200, () => confetti.stop());
     }
 
-    pillButton(this, W / 2, H / 2 + 118, 280, 62, 'もういちど！', () => this.scene.restart());
+    const again = (): void => {
+      this.cameras.main.fadeOut(240, 255, 238, 245);
+      this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => this.scene.restart());
+    };
+    pillButton(this, W / 2, H / 2 + 118, 280, 62, 'もういちど！', again);
     this.time.delayedCall(600, () => {
-      this.input.once('pointerdown', () => this.scene.restart());
+      this.input.once('pointerdown', again);
     });
   }
 }

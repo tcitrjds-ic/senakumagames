@@ -1,12 +1,13 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, FONT_FAMILY } from '../constants';
 import { AudioBox, addMuteButton } from '../audio';
-import { buildBackground, pillButton } from '../ui';
+import { buildBackground, pillButton, fadeStart } from '../ui';
 
 interface GameOverData {
   score: number;
   best: number;
   isNewBest: boolean;
+  distance: number;
 }
 
 export class GameOverScene extends Phaser.Scene {
@@ -16,6 +17,7 @@ export class GameOverScene extends Phaser.Scene {
 
   create(data: GameOverData): void {
     buildBackground(this);
+    this.cameras.main.fadeIn(280, 255, 238, 245);
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x553a2e, 0.45);
 
     // リザルトカード
@@ -37,13 +39,18 @@ export class GameOverScene extends Phaser.Scene {
         fontFamily: FONT_FAMILY, fontSize: '40px', fontStyle: 'bold', color: '#e2504d',
       })
       .setOrigin(0, 0.5);
+    const distLine = this.add
+      .text(0, 8, `はしったきょり ${data.distance}m`, {
+        fontFamily: FONT_FAMILY, fontSize: '20px', fontStyle: 'bold', color: '#7aa1c4',
+      })
+      .setOrigin(0.5);
     const bestLine = this.add
-      .text(0, 18, data.isNewBest ? '✨ ハイスコア更新！ ✨' : `ハイスコア ${data.best}`, {
+      .text(0, 44, data.isNewBest ? '✨ ハイスコア更新！ ✨' : `ハイスコア ${data.best}`, {
         fontFamily: FONT_FAMILY, fontSize: '24px', fontStyle: 'bold',
         color: data.isNewBest ? '#e5a715' : '#a97c8c',
       })
       .setOrigin(0.5);
-    card.add([title, potato, score, bestLine]);
+    card.add([title, potato, score, distLine, bestLine]);
 
     // 笑い顔カットイン（カード上端に重ねる）
     const face = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 140, 'face_laugh').setDepth(51).setScale(0);
@@ -55,7 +62,7 @@ export class GameOverScene extends Phaser.Scene {
       ease: 'Back.easeOut',
     });
 
-    pillButton(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 118, 280, 62, 'もういちど！', () => this.scene.start('Game'));
+    pillButton(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 118, 280, 62, 'もういちど！', () => fadeStart(this, 'Game'));
     const toTitle = this.add
       .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 176, 'タイトルへもどる', {
         fontFamily: FONT_FAMILY, fontSize: '19px', color: '#a97c8c',
@@ -66,7 +73,7 @@ export class GameOverScene extends Phaser.Scene {
     toTitle.on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, e: Phaser.Types.Input.EventData) => {
       e.stopPropagation();
       AudioBox.play('click');
-      this.scene.start('Title');
+      fadeStart(this, 'Title');
     });
 
     addMuteButton(this, GAME_WIDTH - 36, 36);
@@ -88,8 +95,8 @@ export class GameOverScene extends Phaser.Scene {
 
     // 少し待ってから、画面のどこをタップしてもリトライできるように
     this.time.delayedCall(600, () => {
-      this.input.once('pointerdown', () => this.scene.start('Game'));
-      this.input.keyboard?.once('keydown-SPACE', () => this.scene.start('Game'));
+      this.input.once('pointerdown', () => fadeStart(this, 'Game'));
+      this.input.keyboard?.once('keydown-SPACE', () => fadeStart(this, 'Game'));
     });
   }
 }
