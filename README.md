@@ -22,6 +22,21 @@ npm run dev:mancala    # せなくまとマンカラ の開発サーバー
 npm run build          # 両ゲームの本番ビルド（games/*/dist/）
 ```
 
+## 公開（GitHub Pages）
+
+`.github/workflows/deploy.yml` が、ポータル（`portal/`）と両ゲームを
+まとめてGitHub Pagesへデプロイします。サイト構成は
+`/`（ポータル）→ `/runner/`・`/mancala/`（各ゲーム）。
+
+初回のみ設定が必要です:
+
+1. リポジトリの **Settings → Pages → Source** を「**GitHub Actions**」にする
+2. このブランチを `main` にマージする（以降は `main` へのpushで自動デプロイ）
+   - すぐ試す場合は **Actions → Deploy to GitHub Pages → Run workflow** で
+     このブランチを選んで手動実行もできます
+
+公開URL: `https://<ユーザー名>.github.io/senakumagames/`
+
 ## キャラクター画像
 
 プレイヤーは**本物のサムネイルから切り抜いた実画像**（ピクセル無加工）です。
