@@ -6,7 +6,9 @@
   ],
   "scripts": {
     "dev": "npm --workspace runner-2d run dev",
-    "build": "npm --workspace runner-2d run build",
-    "preview": "npm --workspace runner-2d run preview"
+    "dev:mancala": "npm --workspace mancala run dev",
+    "build": "npm --workspace runner-2d run build && npm --workspace mancala run build",
+    "preview": "npm --workspace runner-2d run preview",
+    "preview:mancala": "npm --workspace mancala run preview"
   }
 }
