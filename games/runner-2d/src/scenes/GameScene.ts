@@ -189,10 +189,22 @@ export class GameScene extends Phaser.Scene {
     if (this.isOver) return;
     this.isOver = true;
     this.spawnTimer?.remove();
-    this.player.setTexture('player_hit');
     this.physics.pause();
     this.cameras.main.shake(250, 0.012);
     this.cameras.main.flash(200, 255, 160, 160);
+
+    // 実況サムネ風の泣き顔カットイン
+    const cutIn = this.add
+      .image(this.player.x + 170, this.player.y - 120, 'face_cry')
+      .setScale(0)
+      .setDepth(20);
+    this.tweens.add({
+      targets: cutIn,
+      scale: 0.75,
+      angle: { from: -12, to: 0 },
+      duration: 320,
+      ease: 'Back.easeOut',
+    });
     this.tweens.add({
       targets: this.player,
       angle: -100,

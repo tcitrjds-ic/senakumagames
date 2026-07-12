@@ -17,8 +17,8 @@ export class GameOverScene extends Phaser.Scene {
       .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x553a2e, 0.55)
       .setOrigin(0.5);
 
-    const player = this.add.image(GAME_WIDTH / 2, 150, 'player_happy');
-    player.setScale(120 / player.height).setAngle(8);
+    const player = this.add.image(GAME_WIDTH / 2, 150, 'face_laugh');
+    player.setScale(170 / player.height).setAngle(8);
     this.tweens.add({
       targets: player,
       angle: -8,
