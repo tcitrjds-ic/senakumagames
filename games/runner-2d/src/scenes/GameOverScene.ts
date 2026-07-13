@@ -35,10 +35,28 @@ export class GameOverScene extends Phaser.Scene {
       .setOrigin(0.5);
     const potato = this.add.image(-72, -38, 'potato').setScale(0.4);
     const score = this.add
-      .text(-30, -38, `× ${data.score}`, {
+      .text(-30, -38, '× 0', {
         fontFamily: FONT_FAMILY, fontSize: '40px', fontStyle: 'bold', color: '#e2504d',
       })
       .setOrigin(0, 0.5);
+    // スコアのカウントアップ演出
+    const counter = { v: 0 };
+    this.tweens.add({
+      targets: counter,
+      v: data.score,
+      duration: 750,
+      delay: 250,
+      ease: 'Cubic.easeOut',
+      onUpdate: () => score.setText(`× ${Math.floor(counter.v)}`),
+    });
+    // スコアに応じたメダル
+    const medalKey = data.score >= 30 ? 'medal_gold' : data.score >= 15 ? 'medal_silver' : data.score >= 5 ? 'medal_bronze' : null;
+    if (medalKey) {
+      const medal = this.add.image(-172, -30, medalKey).setScale(0).setAngle(-8);
+      card.add(medal);
+      this.tweens.add({ targets: medal, scale: 1, duration: 420, delay: 900, ease: 'Back.easeOut' });
+      if (medalKey === 'medal_gold') this.time.delayedCall(900, () => AudioBox.play('capture'));
+    }
     const distLine = this.add
       .text(0, 8, `はしったきょり ${data.distance}m`, {
         fontFamily: FONT_FAMILY, fontSize: '20px', fontStyle: 'bold', color: '#7aa1c4',

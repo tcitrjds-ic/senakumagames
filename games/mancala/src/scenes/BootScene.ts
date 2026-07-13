@@ -25,6 +25,7 @@ export class BootScene extends Phaser.Scene {
     });
 
     this.load.image('bg', 'assets/bg.png');
+    this.load.image('vignette', 'assets/vignette.png');
     this.load.image('board', 'assets/board.png');
     this.load.image('glow', 'assets/glow.png');
     this.load.image('sparkle', 'assets/sparkle.png');

@@ -87,6 +87,101 @@ def make_bg_mancala() -> None:
     save(img, MANCALA / "bg.png")
 
 
+def make_skies_extra() -> None:
+    """夕焼けと夜の空（走行距離で昼からクロスフェードする）"""
+    sunset = vgradient(64, 540, [
+        (0.0, (108, 106, 190)),
+        (0.45, (238, 130, 122)),
+        (0.75, (255, 183, 120)),
+        (1.0, (255, 224, 180)),
+    ]).convert("RGBA")
+    save(sunset, RUNNER / "sky_sunset.png")
+    night = vgradient(64, 540, [
+        (0.0, (26, 30, 74)),
+        (0.6, (55, 60, 118)),
+        (1.0, (94, 96, 150)),
+    ]).convert("RGBA")
+    save(night, RUNNER / "sky_night.png")
+
+
+def make_stars() -> None:
+    import random
+    rng = random.Random(7)
+    S = 256
+    img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    for _ in range(42):
+        x, y = rng.randint(4, S - 4), rng.randint(4, S - 4)
+        r = rng.choice([1, 1, 1, 2, 2, 3])
+        a = rng.randint(140, 255)
+        ellipse(d, x, y, r, r, (255, 252, 230, a))
+    for _ in range(5):  # 十字のきらめき
+        x, y = rng.randint(10, S - 10), rng.randint(10, S - 10)
+        ln = rng.randint(4, 7)
+        d.line((x - ln, y, x + ln, y), fill=(255, 252, 230, 200), width=1)
+        d.line((x, y - ln, x, y + ln), fill=(255, 252, 230, 200), width=1)
+    save(img, RUNNER / "stars.png")
+
+
+def make_moon() -> None:
+    S = 256
+    img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    for r in range(S // 2, 60, -2):  # ふんわり光輪
+        a = round(60 * (1 - (r - 60) / (S / 2 - 60)) ** 1.8)
+        ellipse(d, S / 2, S / 2, r, r, (255, 244, 190, a))
+    ellipse(d, S / 2, S / 2, 60, 60, (255, 246, 205, 255))
+    # 欠け（オフセット円で塗り消して三日月に）
+    d.ellipse((S / 2 - 38, S / 2 - 78, S / 2 + 60, S / 2 + 20), fill=(0, 0, 0, 0))
+    save(img, RUNNER / "moon.png")
+
+
+def make_vignette() -> None:
+    """画面四隅をほんのり暗くするビネット"""
+    W, H = 480, 270
+    mask = Image.new("L", (W, H), 255)
+    md = ImageDraw.Draw(mask)
+    steps = 90
+    for k in range(steps):
+        t = k / steps
+        a = round(255 * (1 - t) ** 2)
+        md.ellipse(
+            (W / 2 - W * 0.72 * t, H / 2 - H * 0.78 * t, W / 2 + W * 0.72 * t, H / 2 + H * 0.78 * t),
+            fill=a,
+        )
+    img = Image.new("RGBA", (W, H), (70, 32, 52, 70))
+    img.putalpha(mask.point(lambda v: v * 70 // 255))
+    img = img.filter(ImageFilter.GaussianBlur(10))
+    save(img, RUNNER / "vignette.png", MANCALA / "vignette.png")
+
+
+def make_medals() -> None:
+    for name, base, dark in [
+        ("medal_gold", (250, 205, 88), (214, 158, 44)),
+        ("medal_silver", (208, 214, 224), (156, 164, 180)),
+        ("medal_bronze", (222, 158, 110), (178, 116, 72)),
+    ]:
+        img = Image.new("RGBA", (360, 420), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        # リボン
+        d.polygon([(120, 20), (180, 130), (60, 130)], fill=(226, 80, 90, 255))
+        d.polygon([(240, 20), (300, 130), (180, 130)], fill=(200, 60, 72, 255))
+        # メダル本体
+        ellipse(d, 180, 240, 130, 130, dark + (255,))
+        ellipse(d, 180, 232, 122, 122, base + (255,))
+        ellipse(d, 180, 232, 92, 92, dark + (120,))
+        # 星
+        pts = []
+        for i in range(10):
+            ang = math.pi / 5 * i - math.pi / 2
+            r = 62 if i % 2 == 0 else 26
+            pts.append((180 + r * math.cos(ang), 232 + r * math.sin(ang)))
+        d.polygon(pts, fill=(255, 255, 255, 235))
+        out = sticker(img, outline=12)
+        out = out.resize((110, 128), Image.LANCZOS)
+        save(out, RUNNER / f"{name}.png")
+
+
 def make_sun() -> None:
     S = 256
     img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
@@ -166,9 +261,8 @@ def make_ground() -> None:
 
 # ------------------------------------------------------------ ステッカー小物
 
-def make_potato() -> None:
-    S = 4
-    img = Image.new("RGBA", (110 * S, 110 * S), (0, 0, 0, 0))
+def _potato(box_top, box_bottom, band, mark) -> Image.Image:
+    img = Image.new("RGBA", (440, 440), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     fry_hi, fry, fry_sh = (255, 240, 176, 255), (255, 214, 106, 255), (240, 178, 62, 255)
     # ポテト（奥→手前）
@@ -176,17 +270,31 @@ def make_potato() -> None:
                           (85, 96, 140, fry), (185, 40, 240, fry), (285, 92, 340, fry)]:
         d.rounded_rectangle((x0, y0, x1, 260), radius=22, fill=c)
         d.rounded_rectangle((x0 + 8, y0 + 8, x0 + 20, 250), radius=8, fill=fry_hi)
-    # 赤い箱（グラデ + 白帯）
-    box_top, box_bottom = (255, 106, 106), (219, 64, 76)
+    # 箱（グラデ + 帯）
     for i, y in enumerate(range(215, 400)):
         t = i / 185
         w0 = 78 + t * 34
         d.line((w0, y, 440 - w0, y), fill=lerp(box_top, box_bottom, t))
-    d.polygon([(86, 246), (354, 246), (346, 286), (94, 286)], fill=(255, 248, 240, 255))
-    ellipse(d, 220, 268, 26, 22, (255, 214, 106, 255))  # 帯のポテトマーク
+    d.polygon([(86, 246), (354, 246), (346, 286), (94, 286)], fill=band)
+    ellipse(d, 220, 268, 26, 22, mark)
+    return img
+
+
+def make_potato() -> None:
+    img = _potato((255, 106, 106), (219, 64, 76), (255, 248, 240, 255), (255, 214, 106, 255))
     img = sticker(img, outline=15)
     img = img.resize((128, 128), Image.LANCZOS)
     save(img, RUNNER / "potato.png", MANCALA / "potato.png")
+
+    # ゴールデンポテト（レア・+5点）
+    gold = _potato((255, 214, 92), (222, 158, 40), (255, 252, 238, 255), (226, 80, 90, 255))
+    d = ImageDraw.Draw(gold)
+    for cx, cy, ln in [(90, 130, 16), (350, 180, 13), (140, 330, 12)]:  # きらめき
+        d.line((cx - ln, cy, cx + ln, cy), fill=(255, 255, 255, 230), width=6)
+        d.line((cx, cy - ln, cx, cy + ln), fill=(255, 255, 255, 230), width=6)
+    gold = sticker(gold, outline=15)
+    gold = gold.resize((128, 128), Image.LANCZOS)
+    save(gold, RUNNER / "potato_gold.png")
 
 
 def make_rock() -> None:
@@ -361,6 +469,11 @@ def make_glow() -> None:
 
 if __name__ == "__main__":
     make_sky()
+    make_skies_extra()
+    make_stars()
+    make_moon()
+    make_vignette()
+    make_medals()
     make_bg_mancala()
     make_sun()
     make_hills()

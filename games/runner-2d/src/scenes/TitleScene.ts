@@ -98,9 +98,16 @@ export class TitleScene extends Phaser.Scene {
       start();
     });
 
+    this.add
+      .text(GAME_WIDTH / 2, 372, 'タップ＝ジャンプ ／ 2かいタップで 2だんジャンプ', {
+        fontFamily: FONT_FAMILY, fontSize: '16px', color: '#7d95ab',
+      })
+      .setOrigin(0.5)
+      .setStroke('#ffffff', 5);
+
     const best = loadHighScore();
     if (best > 0) {
-      const badge = this.add.container(GAME_WIDTH / 2, 384);
+      const badge = this.add.container(GAME_WIDTH / 2, 44);
       const g = this.add.graphics();
       g.fillStyle(0xffffff, 0.9).fillRoundedRect(-120, -22, 240, 44, 22);
       g.lineStyle(3, 0xf5cf6e).strokeRoundedRect(-120, -22, 240, 44, 22);

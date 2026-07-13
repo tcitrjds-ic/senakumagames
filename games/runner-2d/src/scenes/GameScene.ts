@@ -52,13 +52,17 @@ export class GameScene extends Phaser.Scene {
     this.score = 0;
     this.combo = 0;
     this.distance = 0;
+    // 開発用: ?dist=600&score=20 で状態を再現できる（時間帯やメダルの確認用）
+    const qp = new URLSearchParams(window.location.search);
+    this.distance = Number(qp.get('dist')) || 0;
+    this.score = Number(qp.get('score')) || 0;
     this.jumpsLeft = 2;
     this.isOver = false;
     this.wasAirborne = false;
     this.nextStepDust = 0;
     this.flowers = [];
 
-    this.bg = buildBackground(this);
+    this.bg = buildBackground(this, true);
     this.cameras.main.fadeIn(280, 255, 238, 245);
 
     // 草地のかざり
@@ -126,7 +130,7 @@ export class GameScene extends Phaser.Scene {
     hudPill(this, 16, 14, 190, 48);
     this.scoreIcon = this.add.image(46, 38, 'potato').setScale(0.3).setDepth(10);
     this.scoreText = this.add
-      .text(74, 38, '× 0', {
+      .text(74, 38, `× ${this.score}`, {
         fontFamily: FONT_FAMILY, fontSize: '28px', fontStyle: 'bold', color: '#8a5a44',
       })
       .setOrigin(0, 0.5)
@@ -242,16 +246,19 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnPotatoes(): void {
-    // ポテトの並び: 一直線 / アーチ / ジグザグ
+    // ポテトの並び: 一直線 / アーチ / ジグザグ。まれにゴールデンポテト（+5）
     const kind = Phaser.Math.Between(0, 2);
     const count = kind === 1 ? 5 : 3;
+    const goldIdx = Math.random() < 0.12 ? Phaser.Math.Between(0, count - 1) : -1;
     const lineY = Phaser.Math.RND.pick([FLOOR_TOP - 50, FLOOR_TOP - 160, FLOOR_TOP - 250]);
     for (let i = 0; i < count; i++) {
       let y = lineY;
       if (kind === 1) y = FLOOR_TOP - 90 - Math.sin((i / (count - 1)) * Math.PI) * 170;
       if (kind === 2) y = lineY + (i % 2 === 0 ? 0 : -80);
-      const potato = this.potatoes.create(GAME_WIDTH + 80 + i * 78, y, 'potato') as Phaser.Physics.Arcade.Sprite;
-      potato.setScale(0.42);
+      const gold = i === goldIdx;
+      const potato = this.potatoes.create(GAME_WIDTH + 80 + i * 78, y, gold ? 'potato_gold' : 'potato') as Phaser.Physics.Arcade.Sprite;
+      potato.setData('gold', gold);
+      potato.setScale(gold ? 0.48 : 0.42);
       potato.body!.setSize(potato.width * 0.66, potato.height * 0.66, true);
       potato.setVelocityX(-this.speed);
       potato.setDepth(8);
@@ -277,12 +284,15 @@ export class GameScene extends Phaser.Scene {
     if (this.isOver) return;
     const px = potato.x;
     const py = potato.y;
+    const gold = potato.getData('gold') === true;
+    const gain = gold ? 5 : 1;
     this.destroyWithShadow(potato);
-    this.score += 1;
+    this.score += gain;
     this.combo += 1;
     this.scoreText.setText(`× ${this.score}`);
     AudioBox.coin(this.combo);
-    this.sparkles.explode(9, px, py);
+    if (gold) AudioBox.play('capture');
+    this.sparkles.explode(gold ? 20 : 9, px, py);
 
     if (this.combo >= 2) {
       this.comboText.setText(`${this.combo} コンボ！`);
@@ -302,8 +312,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     const pop = this.add
-      .text(px, py - 16, '+1', {
-        fontFamily: FONT_FAMILY, fontSize: '26px', fontStyle: 'bold', color: '#ff8fa8',
+      .text(px, py - 16, `+${gain}`, {
+        fontFamily: FONT_FAMILY, fontSize: gold ? '34px' : '26px', fontStyle: 'bold',
+        color: gold ? '#e5a715' : '#ff8fa8',
       })
       .setOrigin(0.5)
       .setStroke('#ffffff', 6)
@@ -384,6 +395,25 @@ export class GameScene extends Phaser.Scene {
     this.bg.hillsNear.tilePositionX += this.speed * 0.28 * dt;
     this.bg.hillsFar.tilePositionX += this.speed * 0.12 * dt;
     this.bg.clouds.tilePositionX += this.speed * 0.05 * dt;
+    if (this.bg.stars) this.bg.stars.tilePositionX += this.speed * 0.015 * dt;
+
+    // 昼 → 夕焼け → 夜 → 昼 のサイクル（900mで一周）
+    const cyc = this.distance % 900;
+    const ramp = (a: number, b: number): number => Phaser.Math.Clamp((cyc - a) / (b - a), 0, 1);
+    const sunsetA = Math.min(ramp(280, 360), 1 - ramp(520, 600));
+    const nightA = Math.min(ramp(520, 600), 1 - ramp(800, 880));
+    this.bg.skySunset?.setAlpha(sunsetA);
+    this.bg.skyNight?.setAlpha(nightA);
+    this.bg.stars?.setAlpha(nightA * 0.95);
+    this.bg.moon?.setAlpha(nightA);
+    this.bg.sun.setAlpha(1 - Math.max(sunsetA * 0.75, nightA));
+    // 夜は景色を青暗く沈ませる
+    const nr = Math.round(255 - (255 - 158) * nightA);
+    const ng = Math.round(255 - (255 - 168) * nightA);
+    const nb = Math.round(255 - (255 - 216) * nightA);
+    const tint = (nr << 16) | (ng << 8) | nb;
+    for (const o of [this.bg.ground, this.bg.hillsFar, this.bg.hillsNear, this.bg.clouds]) o.setTint(tint);
+    for (const f of this.flowers) f.setTint(tint);
 
     for (const f of this.flowers) {
       f.x -= this.speed * dt;

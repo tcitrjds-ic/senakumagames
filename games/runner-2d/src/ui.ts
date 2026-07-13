@@ -7,12 +7,30 @@ export interface Parallax {
   hillsNear: Phaser.GameObjects.TileSprite;
   clouds: Phaser.GameObjects.TileSprite;
   ground: Phaser.GameObjects.TileSprite;
+  sun: Phaser.GameObjects.Image;
+  skySunset?: Phaser.GameObjects.Image;
+  skyNight?: Phaser.GameObjects.Image;
+  stars?: Phaser.GameObjects.TileSprite;
+  moon?: Phaser.GameObjects.Image;
 }
 
-/** 空・太陽・丘2層・雲・地面のパララックス背景を組み立てる */
-export function buildBackground(scene: Phaser.Scene): Parallax {
+/**
+ * 空・太陽・丘2層・雲・地面のパララックス背景を組み立てる。
+ * withCycle=true で夕焼け/夜の空・星・月のレイヤーも重ねる（走行距離で遷移）。
+ */
+export function buildBackground(scene: Phaser.Scene, withCycle = false): Parallax {
   scene.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'sky').setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
-  scene.add.image(795, 92, 'sun').setScale(1.15);
+  let skySunset: Phaser.GameObjects.Image | undefined;
+  let skyNight: Phaser.GameObjects.Image | undefined;
+  let stars: Phaser.GameObjects.TileSprite | undefined;
+  let moon: Phaser.GameObjects.Image | undefined;
+  if (withCycle) {
+    skySunset = scene.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'sky_sunset').setDisplaySize(GAME_WIDTH, GAME_HEIGHT).setAlpha(0);
+    skyNight = scene.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'sky_night').setDisplaySize(GAME_WIDTH, GAME_HEIGHT).setAlpha(0);
+    stars = scene.add.tileSprite(GAME_WIDTH / 2, 170, GAME_WIDTH, 340, 'stars').setAlpha(0);
+  }
+  const sun = scene.add.image(795, 92, 'sun').setScale(1.15);
+  if (withCycle) moon = scene.add.image(795, 96, 'moon').setAlpha(0);
   const clouds = scene.add.tileSprite(GAME_WIDTH / 2, 108, GAME_WIDTH, 128, 'cloud').setAlpha(0.95);
   const hillsFar = scene.add.tileSprite(GAME_WIDTH / 2, FLOOR_TOP - 100, GAME_WIDTH, 200, 'hills_far');
   const hillsNear = scene.add.tileSprite(GAME_WIDTH / 2, FLOOR_TOP - 85, GAME_WIDTH, 170, 'hills_near');
@@ -23,7 +41,9 @@ export function buildBackground(scene: Phaser.Scene): Parallax {
     GROUND_HEIGHT,
     'ground',
   );
-  return { hillsFar, hillsNear, clouds, ground };
+  // 画面四隅をほんのり暗くして映画っぽく
+  scene.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'vignette').setDisplaySize(GAME_WIDTH, GAME_HEIGHT).setDepth(90);
+  return { hillsFar, hillsNear, clouds, ground, sun, skySunset, skyNight, stars, moon };
 }
 
 /** 押すと沈む「ぷにっ」としたピルボタン */

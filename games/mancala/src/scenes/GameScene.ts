@@ -103,6 +103,7 @@ export class GameScene extends Phaser.Scene {
     this.countLabels = [];
 
     this.add.image(W / 2, H / 2, 'bg').setDisplaySize(W, H);
+    this.add.image(W / 2, H / 2, 'vignette').setDisplaySize(W, H).setDepth(90).setAlpha(0.8);
     this.cameras.main.fadeIn(280, 255, 238, 245);
     this.buildBoard();
     this.buildHeader();
@@ -385,6 +386,27 @@ export class GameScene extends Phaser.Scene {
     this.playMove(i, 'player');
   }
 
+  /** ポテト1個が放物線を描いて飛ぶ */
+  private flySeed(from: { x: number; y: number }, to: { x: number; y: number }, onLand: () => void): void {
+    const fly = this.add.image(from.x, from.y, 'potato').setScale(0.2).setDepth(30);
+    const holder = { t: 0 };
+    this.tweens.add({
+      targets: holder,
+      t: 1,
+      duration: 240,
+      ease: 'Sine.easeInOut',
+      onUpdate: () => {
+        fly.x = from.x + (to.x - from.x) * holder.t;
+        fly.y = from.y + (to.y - from.y) * holder.t - Math.sin(holder.t * Math.PI) * 70;
+      },
+      onComplete: () => {
+        fly.destroy();
+        AudioBox.play('tick');
+        onLand();
+      },
+    });
+  }
+
   /** 1手ぶんのアニメーションと盤面反映、次の手番への引き継ぎ */
   private playMove(pit: number, who: Who): void {
     const result = computeMove(this.board, pit, who);
@@ -397,39 +419,25 @@ export class GameScene extends Phaser.Scene {
     result.path.forEach((target, k) => {
       this.time.delayedCall(stepMs * k, () => {
         const dst = this.pitPos(target);
-        const fly = this.add.image(src.x, src.y, 'potato').setScale(0.2).setDepth(30);
-        const holder = { t: 0 };
-        this.tweens.add({
-          targets: holder,
-          t: 1,
-          duration: 230,
-          ease: 'Sine.easeInOut',
-          onUpdate: () => {
-            fly.x = src.x + (dst.x - src.x) * holder.t;
-            fly.y = src.y + (dst.y - src.y) * holder.t - Math.sin(holder.t * Math.PI) * 70;
-          },
-          onComplete: () => {
-            fly.destroy();
-            this.display[target] += 1;
-            this.refreshPit(target);
-            AudioBox.play('tick');
+        this.flySeed(src, dst, () => {
+          this.display[target] += 1;
+          this.refreshPit(target);
+          this.tweens.add({
+            targets: this.seedLayers[target],
+            scale: { from: 1.15, to: 1 },
+            duration: 120,
+            ease: 'Sine.easeOut',
+          });
+          if (target === P_STORE || target === C_STORE) {
+            // ゴールに入った時だけ、きらっと光らせて数字を弾ませる
+            this.sparkles.explode(6, dst.x, dst.y);
             this.tweens.add({
-              targets: this.seedLayers[target],
-              scale: { from: 1.15, to: 1 },
-              duration: 120,
-              ease: 'Sine.easeOut',
+              targets: this.countLabels[target],
+              scale: { from: 1.5, to: 1 },
+              duration: 220,
+              ease: 'Back.easeOut',
             });
-            if (target === P_STORE || target === C_STORE) {
-              // ゴールに入った時だけ、きらっと光らせて数字を弾ませる
-              this.sparkles.explode(6, dst.x, dst.y);
-              this.tweens.add({
-                targets: this.countLabels[target],
-                scale: { from: 1.5, to: 1 },
-                duration: 220,
-                ease: 'Back.easeOut',
-              });
-            }
-          },
+          }
         });
       });
     });
@@ -438,13 +446,29 @@ export class GameScene extends Phaser.Scene {
     this.time.delayedCall(settleAt, () => {
       let extraWait = 0;
       if (result.captured > 0) {
-        extraWait = 800;
+        // 横取り: 両マスのポテトが実際にゴールへ飛んでいく
+        const ownStore = who === 'player' ? P_STORE : C_STORE;
+        const flights = Math.min(result.captured, 10);
+        extraWait = flights * 60 + 520;
         AudioBox.play('capture');
-        for (const p of [result.captureFrom!, result.captureTo!]) {
+        const fromPits = [result.captureFrom!, result.captureTo!];
+        for (const p of fromPits) {
           const pos = this.pitPos(p);
-          this.sparkles.explode(10, pos.x, pos.y);
-          const flash = this.add.ellipse(pos.x, pos.y, 92, 82, 0xffff99, 0.8).setDepth(25);
-          this.tweens.add({ targets: flash, alpha: 0, scale: 1.5, duration: 650, onComplete: () => flash.destroy() });
+          this.sparkles.explode(8, pos.x, pos.y);
+        }
+        this.display[result.captureFrom!] = 0;
+        this.display[result.captureTo!] = 0;
+        this.refreshPit(result.captureFrom!);
+        this.refreshPit(result.captureTo!);
+        const dst = this.pitPos(ownStore);
+        for (let k = 0; k < flights; k++) {
+          const from = this.pitPos(fromPits[k % 2]);
+          this.time.delayedCall(k * 60, () =>
+            this.flySeed(from, dst, () => {
+              this.display[ownStore] += 1;
+              this.refreshPit(ownStore);
+            }),
+          );
         }
         if (who === 'player') {
           this.say(`あーっ！${result.captured}こ 横取りされちゃった〜！`);
@@ -540,28 +564,52 @@ export class GameScene extends Phaser.Scene {
     return options.sort((a, b) => deep(b) - deep(a))[0].pit;
   }
 
-  /** どちらかの列が空になったら残りを各自のゴールへ集めて終了 */
+  /** どちらかの列が空になったら残りを各自のゴールへ飛ばして終了 */
   private checkGameEnd(): boolean {
     const playerEmpty = this.board.slice(0, 6).every((n) => n === 0);
     const cpuEmpty = this.board.slice(7, 13).every((n) => n === 0);
     if (!playerEmpty && !cpuEmpty) return false;
 
-    for (let i = 0; i < 6; i++) {
-      this.board[P_STORE] += this.board[i];
-      this.board[i] = 0;
-      this.board[C_STORE] += this.board[i + 7];
-      this.board[i + 7] = 0;
-    }
-    this.display = this.board.slice();
-    for (let i = 0; i < 14; i++) this.refreshPit(i);
-
     this.over = true;
     this.busy = true;
     this.setTurnBanner('', undefined);
+    this.cpuMarker?.destroy();
+    this.say('のこりは それぞれのゴールへ！');
+
+    // 残ったポテトが順番に各自のゴールへ飛んで集まる
+    let delay = 200;
+    for (let i = 0; i < 6; i++) {
+      for (const [pit, store] of [[i, P_STORE], [i + 7, C_STORE]] as const) {
+        const n = this.board[pit];
+        if (n === 0) continue;
+        this.board[store] += n;
+        this.board[pit] = 0;
+        const from = this.pitPos(pit);
+        const dst = this.pitPos(store);
+        const flights = Math.min(n, 6);
+        this.time.delayedCall(delay, () => {
+          this.display[pit] = 0;
+          this.refreshPit(pit);
+        });
+        for (let k = 0; k < flights; k++) {
+          this.time.delayedCall(delay, () =>
+            this.flySeed(from, dst, () => {
+              this.display[store] += 1;
+              this.refreshPit(store);
+            }),
+          );
+          delay += 55;
+        }
+      }
+    }
 
     const p = this.board[P_STORE];
     const c = this.board[C_STORE];
-    this.time.delayedCall(700, () => this.showResult(p, c));
+    this.time.delayedCall(delay + 500, () => {
+      this.display = this.board.slice();
+      for (let i = 0; i < 14; i++) this.refreshPit(i);
+      this.time.delayedCall(250, () => this.showResult(p, c));
+    });
     return true;
   }
 

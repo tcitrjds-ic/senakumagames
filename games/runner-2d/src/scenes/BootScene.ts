@@ -29,12 +29,21 @@ export class BootScene extends Phaser.Scene {
     });
 
     this.load.image('sky', 'assets/sky.png');
+    this.load.image('sky_sunset', 'assets/sky_sunset.png');
+    this.load.image('sky_night', 'assets/sky_night.png');
+    this.load.image('stars', 'assets/stars.png');
+    this.load.image('moon', 'assets/moon.png');
+    this.load.image('vignette', 'assets/vignette.png');
     this.load.image('sun', 'assets/sun.png');
     this.load.image('hills_far', 'assets/hills_far.png');
     this.load.image('hills_near', 'assets/hills_near.png');
     this.load.image('cloud', 'assets/cloud.png');
     this.load.image('ground', 'assets/ground.png');
     this.load.image('potato', 'assets/potato.png');
+    this.load.image('potato_gold', 'assets/potato_gold.png');
+    this.load.image('medal_gold', 'assets/medal_gold.png');
+    this.load.image('medal_silver', 'assets/medal_silver.png');
+    this.load.image('medal_bronze', 'assets/medal_bronze.png');
     this.load.image('rock', 'assets/rock.png');
     this.load.image('bird1', 'assets/bird1.png');
     this.load.image('bird2', 'assets/bird2.png');
