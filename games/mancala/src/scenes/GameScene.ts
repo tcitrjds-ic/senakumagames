@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { AudioBox, addMuteButton } from '../audio';
-import { FONT, pillButton } from '../ui';
+import { FONT, pillButton, addFullscreenButton } from '../ui';
 
 const W = 960;
 const H = 540;
@@ -64,6 +64,8 @@ export class GameScene extends Phaser.Scene {
   private pulse = { v: 0 };
   private aiLevel: 0 | 1 | 2 = 1; // よわい / ふつう / つよい
   private cpuMarker?: Phaser.GameObjects.Image;
+  private previewGlow!: Phaser.GameObjects.Image;
+  private previewTag!: Phaser.GameObjects.Text;
 
   private pitZones: Phaser.GameObjects.Ellipse[] = [];
   private glows: Phaser.GameObjects.Image[] = [];
@@ -136,8 +138,14 @@ export class GameScene extends Phaser.Scene {
         const glow = this.add.image(x, y, 'glow').setDepth(2).setAlpha(0).setScale(0.72);
         this.glows[i] = glow;
         pit.setInteractive({ useHandCursor: true });
-        pit.on('pointerover', () => (this.hovered = i));
-        pit.on('pointerout', () => (this.hovered = this.hovered === i ? -1 : this.hovered));
+        pit.on('pointerover', () => {
+          this.hovered = i;
+          this.showPreview(i);
+        });
+        pit.on('pointerout', () => {
+          if (this.hovered === i) this.hovered = -1;
+          this.hidePreview();
+        });
         pit.on('pointerdown', () => this.onPitClick(i));
       }
       this.pitZones[i] = pit;
@@ -177,6 +185,37 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setAlpha(0.55)
       .setDepth(4);
+
+    // 手のプレビュー（ホバーで最後のポテトの着地点と結果を先に見せる）
+    this.previewGlow = this.add.image(0, 0, 'glow').setDepth(3).setVisible(false).setScale(0.62).setTint(0xa8e6a1);
+    this.previewTag = this.add
+      .text(0, 0, '', { fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#ffffff' })
+      .setOrigin(0.5)
+      .setDepth(31)
+      .setVisible(false);
+  }
+
+  private showPreview(i: number): void {
+    if (this.busy || this.over || this.board[i] === 0) return;
+    const r = computeMove(this.board, i, 'player');
+    const last = r.path[r.path.length - 1];
+    const pos = this.pitPos(last);
+    this.previewGlow.setPosition(pos.x, pos.y).setVisible(true).setAlpha(0.6);
+    const isStore = last === P_STORE || last === C_STORE;
+    if (r.extraTurn) {
+      this.previewTag.setText('もういっかい！').setStroke('#5b8a3c', 7);
+    } else if (r.captured > 0) {
+      this.previewTag.setText(`よこどり ${r.captured}こ！`).setStroke('#e07a90', 7);
+    } else {
+      this.previewTag.setVisible(false);
+      return;
+    }
+    this.previewTag.setPosition(pos.x, pos.y - (isStore ? 128 : 56)).setVisible(true);
+  }
+
+  private hidePreview(): void {
+    this.previewGlow.setVisible(false);
+    this.previewTag.setVisible(false);
   }
 
   private buildHeader(): void {
@@ -221,6 +260,7 @@ export class GameScene extends Phaser.Scene {
       .setDepth(7);
 
     addMuteButton(this, W - 36, 36);
+    addFullscreenButton(this, W - 36, 92);
   }
 
   private setTurnBanner(label: string, color?: number): void {
@@ -365,7 +405,22 @@ export class GameScene extends Phaser.Scene {
       chips.forEach((c) => c.destroy());
       btn.destroy();
       AudioBox.startMusic();
-      this.startPlayerTurn('きみが先手だよ！すきなくぼみを タップしてね');
+      // 開幕: ポテトがぽんっぽんっと順番に現れる
+      const order = [0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12];
+      order.forEach((pit, k) => {
+        this.seedLayers[pit].setScale(0);
+        this.tweens.add({
+          targets: this.seedLayers[pit],
+          scale: 1,
+          duration: 260,
+          delay: k * 70,
+          ease: 'Back.easeOut',
+          onStart: () => AudioBox.play('tick'),
+        });
+      });
+      this.time.delayedCall(order.length * 70 + 300, () =>
+        this.startPlayerTurn('きみが先手だよ！すきなくぼみを タップしてね'),
+      );
     };
     const btn = pillButton(this, W / 2, 472, 300, 62, 'あそぶ！', begin);
   }
@@ -380,6 +435,7 @@ export class GameScene extends Phaser.Scene {
     if (this.busy || this.over || this.board[i] === 0) return;
     this.busy = true;
     this.setTurnBanner('', undefined);
+    this.hidePreview();
     this.cpuMarker?.destroy();
     this.cpuMarker = undefined;
     AudioBox.play('click');
@@ -472,6 +528,14 @@ export class GameScene extends Phaser.Scene {
         }
         if (who === 'player') {
           this.say(`あーっ！${result.captured}こ 横取りされちゃった〜！`);
+          if (result.captured >= 4) {
+            // 大量横取りされたら泣き顔カットイン
+            const cry = this.add.image(99, 88, 'face_cry').setDepth(40).setScale(0);
+            this.tweens.add({ targets: cry, scale: 0.62, duration: 300, ease: 'Back.easeOut' });
+            this.time.delayedCall(1500, () =>
+              this.tweens.add({ targets: cry, alpha: 0, scale: 0.45, duration: 250, onComplete: () => cry.destroy() }),
+            );
+          }
         } else {
           this.say(`いただき〜！${result.captured}こ ゲット！`);
           this.setAvatar('senakuma_wink', 1200);

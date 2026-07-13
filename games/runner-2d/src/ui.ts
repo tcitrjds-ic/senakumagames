@@ -85,6 +85,28 @@ export function pillButton(
   return c;
 }
 
+/** フルスクリーン切替ボタン（コーナーブラケットのアイコン） */
+export function addFullscreenButton(scene: Phaser.Scene, x: number, y: number): void {
+  const bg = scene.add.circle(x, y, 24, 0xffffff, 0.9).setDepth(60).setStrokeStyle(3, 0xf0b7c8);
+  const g = scene.add.graphics().setDepth(61);
+  g.lineStyle(3.5, 0x8a5a44);
+  const s = 8;
+  for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
+    g.beginPath();
+    g.moveTo(x + dx * s, y + dy * (s - 5));
+    g.lineTo(x + dx * s, y + dy * s);
+    g.lineTo(x + dx * (s - 5), y + dy * s);
+    g.strokePath();
+  }
+  bg.setInteractive({ useHandCursor: true });
+  bg.on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+    event.stopPropagation();
+    AudioBox.play('click');
+    if (scene.scale.isFullscreen) scene.scale.stopFullscreen();
+    else scene.scale.startFullscreen();
+  });
+}
+
 /** フェードアウトしてからシーンを切り替える（ぶつ切り遷移をなくす） */
 export function fadeStart(scene: Phaser.Scene, key: string, data?: object): void {
   scene.cameras.main.fadeOut(240, 255, 238, 245);

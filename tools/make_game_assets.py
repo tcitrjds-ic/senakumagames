@@ -366,6 +366,32 @@ def make_flowers() -> None:
         save(out, RUNNER / f"{name}.png")
 
 
+def make_tree() -> None:
+    """背景のもこもこの木（ステッカー調）"""
+    img = Image.new("RGBA", (300, 380), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle((132, 210, 168, 370), radius=16, fill=(158, 110, 74, 255))
+    d.polygon([(150, 250), (110, 300), (150, 285)], fill=(138, 94, 62, 255))
+    for cx, cy, r, c in [(95, 165, 62, (120, 190, 100, 255)), (205, 165, 62, (120, 190, 100, 255)),
+                         (150, 105, 75, (143, 209, 119, 255)), (150, 185, 68, (143, 209, 119, 255))]:
+        ellipse(d, cx, cy, r, r, c)
+    ellipse(d, 128, 92, 26, 26, (184, 230, 154, 255))  # ハイライト
+    out = sticker(img, outline=11, shadow=(4, 7), sh_alpha=55)
+    out = out.resize((92, 116), Image.LANCZOS)
+    save(out, RUNNER / "tree.png")
+
+
+def make_streak() -> None:
+    """スピードアップ時に流れる白い線"""
+    img = Image.new("RGBA", (128, 12), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    for x in range(128):
+        a = round(230 * (x / 128) ** 1.2)
+        d.line((x, 3, x, 9), fill=(255, 255, 255, a))
+    d.rounded_rectangle((100, 2, 127, 10), radius=5, fill=(255, 255, 255, 240))
+    save(img, RUNNER / "streak.png")
+
+
 def make_shadow() -> None:
     """接地影（やわらかい黒楕円）"""
     S = 256
@@ -483,6 +509,8 @@ if __name__ == "__main__":
     make_rock()
     make_bird()
     make_flowers()
+    make_tree()
+    make_streak()
     make_shadow()
     make_particles()
     make_board()

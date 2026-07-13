@@ -4,7 +4,8 @@ import Phaser from 'phaser';
  * WebAudioでSEとBGMをその場で合成する小さなサウンドボックス。
  * 音声ファイル不要・オフラインでも鳴る。ミュート設定は保存される。
  */
-export type SfxName = 'jump' | 'coin' | 'hit' | 'click' | 'tick' | 'capture' | 'win' | 'lose';
+export type SfxName =
+  | 'jump' | 'coin' | 'hit' | 'click' | 'tick' | 'capture' | 'win' | 'lose' | 'thud' | 'speedup';
 
 const MUTE_KEY = 'senakuma:muted';
 
@@ -66,6 +67,8 @@ class AudioBoxImpl {
       case 'capture': [660, 880, 1108].forEach((f, i) => this.tone(f, 0.12, 'triangle', 0.06, i * 0.06)); break;
       case 'win': [523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.22, 'triangle', 0.07, i * 0.13)); break;
       case 'lose': [392, 330, 262].forEach((f, i) => this.tone(f, 0.26, 'triangle', 0.06, i * 0.16)); break;
+      case 'thud': this.tone(95, 0.09, 'sine', 0.06); break;
+      case 'speedup': this.tone(420, 0.24, 'square', 0.05, 0, 940); this.tone(1240, 0.12, 'triangle', 0.05, 0.2); break;
     }
   }
 

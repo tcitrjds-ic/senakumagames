@@ -7,7 +7,7 @@ import {
   loadHighScore,
 } from '../constants';
 import { AudioBox, addMuteButton } from '../audio';
-import { buildBackground, pillButton, fadeStart } from '../ui';
+import { buildBackground, pillButton, fadeStart, addFullscreenButton } from '../ui';
 
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -42,6 +42,19 @@ export class TitleScene extends Phaser.Scene {
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
+    });
+    // ときどきウインクする待機モーション
+    this.time.addEvent({
+      delay: 3400,
+      loop: true,
+      callback: () => {
+        player.setTexture('player_jump');
+        player.setScale(PLAYER_HEIGHT / player.height);
+        this.time.delayedCall(320, () => {
+          player.setTexture('player');
+          player.setScale(PLAYER_HEIGHT / player.height);
+        });
+      },
     });
 
     // デザインロゴ: 1文字ずつ色を変えてアーチ状に並べ、波打たせる
@@ -128,6 +141,7 @@ export class TitleScene extends Phaser.Scene {
       .setAlpha(0.9);
 
     addMuteButton(this, GAME_WIDTH - 36, 36);
+    addFullscreenButton(this, GAME_WIDTH - 36, 92);
 
     // 画面のどこをタップしてもスタートできる（ボタン類はstopPropagationで除外される）
     this.input.once('pointerdown', () => {

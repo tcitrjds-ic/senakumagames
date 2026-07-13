@@ -10,7 +10,7 @@ import {
   saveHighScore,
 } from '../constants';
 import { AudioBox, addMuteButton } from '../audio';
-import { buildBackground, hudPill, fadeStart, Parallax } from '../ui';
+import { buildBackground, hudPill, fadeStart, addFullscreenButton, Parallax } from '../ui';
 
 const START_SPEED = 280;
 const MAX_SPEED = 620;
@@ -39,9 +39,13 @@ export class GameScene extends Phaser.Scene {
   private distance = 0;
   private jumpsLeft = 2;
   private isOver = false;
+  private isPaused = false;
+  private pausedAt = 0;
+  private speedLevel = 0;
   private wasAirborne = false;
   private nextStepDust = 0;
   private spawnTimer?: Phaser.Time.TimerEvent;
+  private trees: Phaser.GameObjects.Image[] = [];
 
   constructor() {
     super('Game');
@@ -62,8 +66,22 @@ export class GameScene extends Phaser.Scene {
     this.nextStepDust = 0;
     this.flowers = [];
 
+    this.isPaused = false;
+    this.speedLevel = Math.floor(this.distance / 250);
+    this.cameras.main.setZoom(1);
     this.bg = buildBackground(this, true);
     this.cameras.main.fadeIn(280, 255, 238, 245);
+
+    // 背景の木（丘の手前をゆっくり流れる）
+    this.trees = [];
+    for (let i = 0; i < 2; i++) {
+      const t = this.add
+        .image(Phaser.Math.Between(0, GAME_WIDTH) + i * 480, FLOOR_TOP + 6, 'tree')
+        .setOrigin(0.5, 1)
+        .setScale(Phaser.Math.FloatBetween(0.9, 1.25))
+        .setDepth(2);
+      this.trees.push(t);
+    }
 
     // 草地のかざり
     for (let i = 0; i < 5; i++) {
@@ -163,12 +181,72 @@ export class GameScene extends Phaser.Scene {
         .setDepth(10);
     }
     addMuteButton(this, GAME_WIDTH - 36, 38);
+    addFullscreenButton(this, GAME_WIDTH - 36, 92);
+    this.buildPauseButton();
 
     this.input.on('pointerdown', () => this.jump());
     this.input.keyboard?.on('keydown-SPACE', () => this.jump());
     this.input.keyboard?.on('keydown-UP', () => this.jump());
+    this.input.keyboard?.on('keydown-P', () => this.togglePause());
 
     this.scheduleNextSpawn(600);
+  }
+
+  private buildPauseButton(): void {
+    const x = GAME_WIDTH - 36;
+    const y = 146;
+    const bg = this.add.circle(x, y, 24, 0xffffff, 0.9).setDepth(60).setStrokeStyle(3, 0xf0b7c8);
+    const g = this.add.graphics().setDepth(61);
+    g.fillStyle(0x8a5a44).fillRoundedRect(x - 8, y - 9, 6, 18, 3).fillRoundedRect(x + 2, y - 9, 6, 18, 3);
+    bg.setInteractive({ useHandCursor: true });
+    bg.on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, e: Phaser.Types.Input.EventData) => {
+      e.stopPropagation();
+      this.togglePause();
+    });
+  }
+
+  private pauseOverlay: Phaser.GameObjects.GameObject[] = [];
+
+  private togglePause(): void {
+    if (this.isOver) return;
+    if (!this.isPaused) {
+      this.isPaused = true;
+      this.pausedAt = performance.now();
+      AudioBox.play('click');
+      this.physics.pause();
+      this.time.paused = true;
+      this.tweens.pauseAll();
+      this.pauseOverlay = [
+        this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x553a2e, 0.55).setDepth(70),
+        this.add
+          .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 24, 'ポーズ', {
+            fontFamily: FONT_FAMILY, fontSize: '52px', fontStyle: 'bold', color: '#ffffff',
+          })
+          .setOrigin(0.5).setStroke('#8a5a44', 10).setDepth(71),
+        this.add
+          .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 36, 'タップで さいかい', {
+            fontFamily: FONT_FAMILY, fontSize: '22px', color: '#ffe9d6',
+          })
+          .setOrigin(0.5).setDepth(71),
+      ];
+      const resume = (): void => {
+        if (performance.now() - this.pausedAt < 300) {
+          this.input.once('pointerdown', resume);
+          return;
+        }
+        this.pauseOverlay.forEach((o) => o.destroy());
+        this.pauseOverlay = [];
+        this.physics.resume();
+        this.time.paused = false;
+        this.tweens.resumeAll();
+        AudioBox.play('click');
+        // 再開タップがジャンプ入力に化けないよう、少しだけ待ってから解除
+        window.setTimeout(() => {
+          this.isPaused = false;
+        }, 60);
+      };
+      this.input.once('pointerdown', resume);
+    }
   }
 
   private attachShadow(sprite: Phaser.Physics.Arcade.Sprite, scale: number, alpha: number): void {
@@ -177,7 +255,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private jump(): void {
-    if (this.isOver) return;
+    if (this.isOver || this.isPaused) return;
     const onFloor = this.player.body!.blocked.down || this.player.body!.touching.down;
     if (onFloor) this.jumpsLeft = 2;
     if (this.jumpsLeft <= 0) return;
@@ -203,6 +281,12 @@ export class GameScene extends Phaser.Scene {
     const delay = delayOverride ?? Phaser.Math.Between(750, 1250) * factor;
     this.spawnTimer = this.time.delayedCall(delay, () => {
       if (this.isOver) return;
+      // 30%は「設計された配置チャンク」、残りはランダム
+      if (Math.random() < 0.3) {
+        this.spawnChunk();
+        this.scheduleNextSpawn(Phaser.Math.Between(1400, 1800) * factor);
+        return;
+      }
       const roll = Math.random();
       if (roll < 0.48) this.spawnPotatoes();
       else if (roll < 0.8) this.spawnRock();
@@ -211,9 +295,37 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private spawnRock(): void {
+  /** 手作りの配置チャンク（ジャンプで取る/くぐって取る、を教える配置） */
+  private spawnChunk(): void {
+    const kind = Phaser.Math.Between(0, 3);
+    if (kind === 0) {
+      // 岩ごえアーチ: 岩の上にポテトの弧
+      this.spawnRock(80);
+      for (let i = 0; i < 5; i++) {
+        this.spawnOnePotato(i * 62, FLOOR_TOP - 120 - Math.sin((i / 4) * Math.PI) * 140, i === 2);
+      }
+    } else if (kind === 1) {
+      // とりの下をくぐると低空ラインがもらえる
+      this.spawnBird(140);
+      for (let i = 0; i < 3; i++) this.spawnOnePotato(60 + i * 70, FLOOR_TOP - 48, false);
+    } else if (kind === 2) {
+      // ダブル岩: あいだの空中にごほうび
+      this.spawnRock(0);
+      this.spawnRock(330);
+      this.spawnOnePotato(165, FLOOR_TOP - 250, true);
+    } else {
+      // ポテトのかいだん
+      for (let s = 0; s < 3; s++) {
+        for (let i = 0; i < 2; i++) {
+          this.spawnOnePotato(s * 170 + i * 70, FLOOR_TOP - 55 - s * 95, false);
+        }
+      }
+    }
+  }
+
+  private spawnRock(xOff = 0): void {
     const scale = Phaser.Math.FloatBetween(0.55, 0.95);
-    const rock = this.obstacles.create(GAME_WIDTH + 80, 0, 'rock') as Phaser.Physics.Arcade.Sprite;
+    const rock = this.obstacles.create(GAME_WIDTH + 80 + xOff, 0, 'rock') as Phaser.Physics.Arcade.Sprite;
     rock.setScale(scale);
     rock.setY(FLOOR_TOP - (rock.height * scale) / 2 + 10);
     rock.body!.setSize(rock.width * 0.72, rock.height * 0.66, true);
@@ -222,9 +334,9 @@ export class GameScene extends Phaser.Scene {
     this.attachShadow(rock, 0.7 + scale * 0.5, 0.35);
   }
 
-  private spawnBird(): void {
+  private spawnBird(xOff = 0): void {
     // 頭の高さを飛ぶ「とり」: しゃがみ不要、走って くぐるか、タイミングよく跳び越える
-    const bird = this.obstacles.create(GAME_WIDTH + 80, FLOOR_TOP - 165, 'bird1') as Phaser.Physics.Arcade.Sprite;
+    const bird = this.obstacles.create(GAME_WIDTH + 80 + xOff, FLOOR_TOP - 165, 'bird1') as Phaser.Physics.Arcade.Sprite;
     bird.setScale(0.9);
     bird.body!.setSize(bird.width * 0.6, bird.height * 0.6, true);
     bird.setVelocityX(-this.speed * 1.18);
@@ -255,22 +367,71 @@ export class GameScene extends Phaser.Scene {
       let y = lineY;
       if (kind === 1) y = FLOOR_TOP - 90 - Math.sin((i / (count - 1)) * Math.PI) * 170;
       if (kind === 2) y = lineY + (i % 2 === 0 ? 0 : -80);
-      const gold = i === goldIdx;
-      const potato = this.potatoes.create(GAME_WIDTH + 80 + i * 78, y, gold ? 'potato_gold' : 'potato') as Phaser.Physics.Arcade.Sprite;
-      potato.setData('gold', gold);
-      potato.setScale(gold ? 0.48 : 0.42);
-      potato.body!.setSize(potato.width * 0.66, potato.height * 0.66, true);
-      potato.setVelocityX(-this.speed);
-      potato.setDepth(8);
-      const h = FLOOR_TOP - y;
-      this.attachShadow(potato, Phaser.Math.Clamp(0.62 - h / 900, 0.25, 0.62), Phaser.Math.Clamp(0.3 - h / 1600, 0.08, 0.3));
+      this.spawnOnePotato(i * 78, y, i === goldIdx);
+    }
+  }
+
+  private spawnOnePotato(xOff: number, y: number, gold: boolean): void {
+    const potato = this.potatoes.create(GAME_WIDTH + 80 + xOff, y, gold ? 'potato_gold' : 'potato') as Phaser.Physics.Arcade.Sprite;
+    potato.setData('gold', gold);
+    potato.setScale(gold ? 0.48 : 0.42);
+    potato.body!.setSize(potato.width * 0.66, potato.height * 0.66, true);
+    potato.setVelocityX(-this.speed);
+    potato.setDepth(8);
+    const h = FLOOR_TOP - y;
+    this.attachShadow(potato, Phaser.Math.Clamp(0.62 - h / 900, 0.25, 0.62), Phaser.Math.Clamp(0.3 - h / 1600, 0.08, 0.3));
+    this.tweens.add({
+      targets: potato,
+      angle: { from: -8, to: 8 },
+      duration: 500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+  }
+
+  /** 250mごとのスピードアップ演出（バナー + ズームパルス + 流線） */
+  private announceSpeedUp(): void {
+    AudioBox.play('speedup');
+    this.cameras.main.zoomTo(1.045, 130, 'Sine.easeOut', false, (_c, p) => {
+      if (p === 1) this.cameras.main.zoomTo(1, 200, 'Sine.easeIn');
+    });
+    const banner = this.add.container(GAME_WIDTH + 160, 96).setDepth(30);
+    const g = this.add.graphics();
+    g.fillStyle(0x8a5a44, 0.2).fillRoundedRect(-127, -21, 254, 46, 23);
+    g.fillStyle(0xffb84d, 1).fillRoundedRect(-130, -25, 254, 46, 23);
+    const label = this.add
+      .text(0, -2, '⚡ スピードアップ！', {
+        fontFamily: FONT_FAMILY, fontSize: '24px', fontStyle: 'bold', color: '#ffffff',
+      })
+      .setOrigin(0.5);
+    banner.add([g, label]);
+    this.tweens.add({
+      targets: banner,
+      x: GAME_WIDTH / 2,
+      duration: 320,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        this.tweens.add({
+          targets: banner,
+          x: -220,
+          delay: 900,
+          duration: 280,
+          ease: 'Sine.easeIn',
+          onComplete: () => banner.destroy(),
+        });
+      },
+    });
+    for (let i = 0; i < 10; i++) {
+      const y = Phaser.Math.Between(60, GAME_HEIGHT - 120);
+      const line = this.add.image(GAME_WIDTH + 80, y, 'streak').setDepth(16).setAlpha(0.85);
       this.tweens.add({
-        targets: potato,
-        angle: { from: -8, to: 8 },
-        duration: 500,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.easeInOut',
+        targets: line,
+        x: -120,
+        duration: Phaser.Math.Between(280, 450),
+        delay: i * 35,
+        ease: 'Linear',
+        onComplete: () => line.destroy(),
       });
     }
   }
@@ -344,6 +505,28 @@ export class GameScene extends Phaser.Scene {
     this.feverTrail.stop();
     AudioBox.play('hit');
 
+    // 集めたポテトがばら撒かれる（ソニック式の喪失感）
+    const drops = Math.min(this.score, 8);
+    for (let i = 0; i < drops; i++) {
+      const p = this.add.image(this.player.x, this.player.y - 20, 'potato').setScale(0.3).setDepth(13);
+      const dx = Phaser.Math.Between(-160, 160);
+      const peak = Phaser.Math.Between(80, 190);
+      const holder = { t: 0 };
+      this.tweens.add({
+        targets: holder,
+        t: 1,
+        duration: Phaser.Math.Between(550, 800),
+        ease: 'Linear',
+        onUpdate: () => {
+          p.x = this.player.x + dx * holder.t;
+          p.y = this.player.y - 20 - Math.sin(holder.t * Math.PI) * peak + holder.t * 120;
+          p.angle = holder.t * dx;
+          p.setAlpha(1 - holder.t * 0.9);
+        },
+        onComplete: () => p.destroy(),
+      });
+    }
+
     // ヒットストップ（一瞬止めてから吹き飛ぶ）
     this.time.delayedCall(90, () => {
       this.cameras.main.shake(250, 0.012);
@@ -385,12 +568,17 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number): void {
-    if (this.isOver) return;
+    if (this.isOver || this.isPaused) return;
     const dt = delta / 1000;
 
     this.speed = Math.min(MAX_SPEED, this.speed + SPEED_PER_SEC * dt);
     this.distance += this.speed * dt * 0.05; // 見た目に気持ちいい速さでメートルが進む
     this.distText.setText(`${Math.floor(this.distance)}m`);
+    const level = Math.floor(this.distance / 250);
+    if (level > this.speedLevel) {
+      this.speedLevel = level;
+      this.announceSpeedUp();
+    }
     this.bg.ground.tilePositionX += this.speed * dt;
     this.bg.hillsNear.tilePositionX += this.speed * 0.28 * dt;
     this.bg.hillsFar.tilePositionX += this.speed * 0.12 * dt;
@@ -423,6 +611,13 @@ export class GameScene extends Phaser.Scene {
         f.setScale(Phaser.Math.FloatBetween(0.75, 1.05));
       }
     }
+    for (const t of this.trees) {
+      t.x -= this.speed * dt;
+      if (t.x < -80) {
+        t.x = GAME_WIDTH + Phaser.Math.Between(80, 500);
+        t.setScale(Phaser.Math.FloatBetween(0.9, 1.25));
+      }
+    }
 
     const body = this.player.body as Phaser.Physics.Arcade.Body;
     if (body.blocked.down) {
@@ -430,6 +625,7 @@ export class GameScene extends Phaser.Scene {
       if (this.wasAirborne) {
         // 着地の演出
         this.wasAirborne = false;
+        AudioBox.play('thud');
         this.dust.explode(8, this.player.x, FLOOR_TOP - 4);
         this.tweens.add({
           targets: this.player,
