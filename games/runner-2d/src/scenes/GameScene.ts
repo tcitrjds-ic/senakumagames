@@ -10,7 +10,7 @@ import {
   saveHighScore,
 } from '../constants';
 import { AudioBox, addMuteButton } from '../audio';
-import { buildBackground, hudPill, fadeStart, addFullscreenButton, Parallax } from '../ui';
+import { buildBackground, hudPill, fadeStart, addFullscreenButton, addHomeButton, Parallax } from '../ui';
 
 const START_SPEED = 280;
 const MAX_SPEED = 620;
@@ -183,6 +183,7 @@ export class GameScene extends Phaser.Scene {
     addMuteButton(this, GAME_WIDTH - 36, 38);
     addFullscreenButton(this, GAME_WIDTH - 36, 92);
     this.buildPauseButton();
+    addHomeButton(this, GAME_WIDTH - 36, 200);
 
     this.input.on('pointerdown', () => this.jump());
     this.input.keyboard?.on('keydown-SPACE', () => this.jump());
@@ -636,9 +637,10 @@ export class GameScene extends Phaser.Scene {
           ease: 'Sine.easeOut',
         });
       }
-      if (this.player.texture.key !== 'player') this.player.setTexture('player'); // 着地で表情を戻す
-      // 走りの「とてとて」感: ゆれ + 定期的な土ぼこり
-      this.player.angle = Math.sin(time / 90) * 4;
+      // 走り2コマアニメ（player ⇄ player_run）＋ 上下の弾み
+      const runFrame = Math.floor(time / 120) % 2 === 0 ? 'player' : 'player_run';
+      if (this.player.texture.key !== runFrame) this.player.setTexture(runFrame);
+      this.player.angle = Math.sin(time / 80) * 2.5;
       if (time > this.nextStepDust) {
         this.nextStepDust = time + 260;
         this.dust.explode(1, this.player.x - 26, FLOOR_TOP - 4);

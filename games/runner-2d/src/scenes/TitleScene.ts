@@ -7,7 +7,7 @@ import {
   loadHighScore,
 } from '../constants';
 import { AudioBox, addMuteButton } from '../audio';
-import { buildBackground, pillButton, fadeStart, addFullscreenButton } from '../ui';
+import { buildBackground, pillButton, fadeStart, addFullscreenButton, addHomeButton } from '../ui';
 
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -43,17 +43,13 @@ export class TitleScene extends Phaser.Scene {
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
-    // ときどきウインクする待機モーション
+    // その場でとてとて足踏みする待機モーション（player ⇄ player_run）
     this.time.addEvent({
-      delay: 3400,
+      delay: 260,
       loop: true,
       callback: () => {
-        player.setTexture('player_jump');
+        player.setTexture(player.texture.key === 'player' ? 'player_run' : 'player');
         player.setScale(PLAYER_HEIGHT / player.height);
-        this.time.delayedCall(320, () => {
-          player.setTexture('player');
-          player.setScale(PLAYER_HEIGHT / player.height);
-        });
       },
     });
 
@@ -134,12 +130,13 @@ export class TitleScene extends Phaser.Scene {
     }
 
     this.add
-      .text(12, 526, '非公式ファンメイド / 画像は許諾を得て使用', {
+      .text(12, 526, '非公式ファンメイド作品', {
         fontFamily: FONT_FAMILY, fontSize: '13px', color: '#b08c96',
       })
       .setOrigin(0, 1)
       .setAlpha(0.9);
 
+    addHomeButton(this, 40, 40);
     addMuteButton(this, GAME_WIDTH - 36, 36);
     addFullscreenButton(this, GAME_WIDTH - 36, 92);
 

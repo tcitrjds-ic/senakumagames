@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { AudioBox, addMuteButton } from '../audio';
-import { FONT, pillButton, addFullscreenButton } from '../ui';
+import { FONT, pillButton, addFullscreenButton, addHomeButton } from '../ui';
 
 const W = 960;
 const H = 540;
@@ -261,6 +261,7 @@ export class GameScene extends Phaser.Scene {
 
     addMuteButton(this, W - 36, 36);
     addFullscreenButton(this, W - 36, 92);
+    addHomeButton(this, W - 36, 148);
   }
 
   private setTurnBanner(label: string, color?: number): void {

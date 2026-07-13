@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, FONT_FAMILY } from '../constants';
 import { AudioBox, addMuteButton } from '../audio';
-import { buildBackground, pillButton, fadeStart, addFullscreenButton } from '../ui';
+import { buildBackground, pillButton, fadeStart, addFullscreenButton, addHomeButton } from '../ui';
 
 interface GameOverData {
   score: number;
@@ -94,6 +94,7 @@ export class GameOverScene extends Phaser.Scene {
       fadeStart(this, 'Title');
     });
 
+    addHomeButton(this, 40, 40);
     addMuteButton(this, GAME_WIDTH - 36, 36);
     addFullscreenButton(this, GAME_WIDTH - 36, 92);
 
