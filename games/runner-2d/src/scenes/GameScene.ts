@@ -505,6 +505,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.pause();
     this.feverTrail.stop();
     AudioBox.play('hit');
+    AudioBox.voice('cry'); // ボイスが配置されていれば「あーっ！」
 
     // 集めたポテトがばら撒かれる（ソニック式の喪失感）
     const drops = Math.min(this.score, 8);

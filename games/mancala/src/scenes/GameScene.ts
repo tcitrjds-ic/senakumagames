@@ -406,6 +406,7 @@ export class GameScene extends Phaser.Scene {
       chips.forEach((c) => c.destroy());
       btn.destroy();
       AudioBox.startMusic();
+      AudioBox.voice('start'); // ボイスが配置されていれば「スタート！」
       // 開幕: ポテトがぽんっぽんっと順番に現れる
       const order = [0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12];
       order.forEach((pit, k) => {
@@ -693,6 +694,9 @@ export class GameScene extends Phaser.Scene {
     const line = playerWon ? 'まけた〜！きみ つよいね…！' : p < c ? 'やった〜！わたしの かち！' : 'いいしょうぶだったね〜！';
     this.say(line);
     AudioBox.play(playerWon ? 'win' : p < c ? 'lose' : 'capture');
+    // せなくま視点のボイス: 負けたら cry、勝ったら yay（配置されていれば）
+    if (playerWon) AudioBox.voice('cry');
+    else if (p < c) AudioBox.voice('yay');
 
     card.add(
       this.add

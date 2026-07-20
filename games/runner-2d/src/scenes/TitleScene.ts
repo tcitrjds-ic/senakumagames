@@ -99,6 +99,7 @@ export class TitleScene extends Phaser.Scene {
 
     const start = (): void => {
       AudioBox.startMusic();
+      AudioBox.voice('start'); // ボイスが配置されていれば「スタート！」
       fadeStart(this, 'Game');
     };
     pillButton(this, GAME_WIDTH / 2, 318, 340, 72, 'タップで スタート！', start);

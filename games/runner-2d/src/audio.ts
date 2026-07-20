@@ -50,6 +50,25 @@ class AudioBoxImpl {
     osc.stop(t + dur + 0.05);
   }
 
+  // --- ボイス: assets/voice/<name>.ogg が配置されていれば再生、無ければ何もしない ---
+  private voiceCache = new Map<string, HTMLAudioElement | null>();
+
+  voice(name: string): void {
+    if (this.muted) return;
+    let a = this.voiceCache.get(name);
+    if (a === null) return; // 以前ロードに失敗（未配置）
+    if (a === undefined) {
+      a = new Audio(`assets/voice/${name}.ogg`);
+      a.volume = 0.9;
+      a.addEventListener('error', () => this.voiceCache.set(name, null));
+      this.voiceCache.set(name, a);
+    }
+    a.currentTime = 0;
+    void a.play().catch(() => {
+      /* 未配置・未対応環境では黙ってスキップ */
+    });
+  }
+
   /** コイン音。コンボが続くほど音程が上がる */
   coin(step = 0): void {
     const f = 880 * Math.pow(2, Math.min(step, 16) / 24);

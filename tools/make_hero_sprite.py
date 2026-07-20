@@ -1,150 +1,125 @@
 #!/usr/bin/env python3
-"""せなくまラン主人公のドット絵スプライト（ビーズ作品に忠実・フラット版）。
+"""せなくまラン主人公のドット絵スプライト（クリーン・ソリッドピクセル版）。
 
-方針（ユーザー確定）: アイロンビーズ作品に忠実。
-  - フラット（べた塗り）の色。なめらかグラデは使わない
-  - カクカクした大きめのドット（=ビーズ1粒）
-  - 太い濃茶の輪郭
-  - 小さめの点目（実際のせなくま寄り・素朴）
-  - 大きな丸いクマ耳、金髪ボブ、赤いロンパース、茶のくつ
-  - 頭:体 ≒ 4:6 のバランス、進行方向（右）向き、走り2コマ＋ジャンプ
-
-各ドットを文字グリッドで手配置し、ビーズ風の丸みテクスチャを付けてから
-NEAREST拡大する。
+方針: アイロンビーズ作品のパターンに忠実だが、描画は「きれいなドット絵」。
+  - 1マス = ソリッドな正方形ピクセル（テクスチャ・粒模様は入れない）
+  - フラットな配色 + 最小限の影1段
+  - 小さめの点目 / 大きな丸いクマ耳 / 金髪ボブ / 赤い服 / 茶のくつ
+  - 顔まわりのパーツを1マスぶん右へ寄せて進行方向（右）を示す
+  - 頭:体 ≒ 表参照どおり大きめの頭
 
 出力: player.png / player_run.png / player_jump.png
 """
 
 from pathlib import Path
-from PIL import Image, ImageDraw
+from PIL import Image
 
 OUT = Path(__file__).resolve().parents[1] / "games" / "runner-2d" / "public" / "assets"
-BEAD = 16  # 1ビーズの表示px
+SCALE = 12  # 1マス=12px
 
 PAL = {
     ".": None,
-    "K": (74, 51, 37, 255),     # 輪郭
-    "E": (150, 101, 60, 255),   # 耳
-    "e": (200, 154, 104, 255),  # 耳内
-    "H": (236, 201, 106, 255),  # 髪
-    "h": (208, 164, 74, 255),   # 髪影（最小限）
-    "S": (250, 236, 216, 255),  # 肌
-    "Y": (66, 47, 38, 255),     # 目（点）
-    "P": (247, 166, 182, 255),  # ほっぺ
-    "R": (202, 57, 55, 255),    # 服
-    "r": (168, 41, 45, 255),    # 服影（最小限）
-    "W": (248, 242, 230, 255),  # 襟
-    "B": (112, 75, 48, 255),    # くつ
-    "b": (84, 55, 36, 255),     # くつ影
-    "M": (176, 84, 70, 255),    # 口
+    "K": (70, 48, 34, 255),     # 輪郭（こげ茶）
+    "E": (140, 95, 58, 255),    # クマ耳
+    "e": (200, 152, 102, 255),  # クマ耳・内側
+    "H": (238, 202, 108, 255),  # 髪
+    "h": (206, 164, 76, 255),   # 髪の影（サイドのみ）
+    "S": (252, 238, 218, 255),  # 肌
+    "Y": (56, 42, 34, 255),     # 目（点）
+    "P": (248, 168, 184, 255),  # ほっぺ
+    "M": (176, 88, 72, 255),    # 口
+    "R": (206, 60, 58, 255),    # 服（赤）
+    "r": (170, 42, 46, 255),    # 服の影
+    "W": (250, 245, 233, 255),  # 襟
+    "B": (110, 72, 46, 255),    # くつ
 }
 
-# ===== 頭（全ポーズ共通・幅22）=====
+# ===== 頭（全ポーズ共通・幅24）=====
 HEAD = [
-    "..KKK.........KKK.....",
-    ".KEEEK.......KEEEK....",
-    ".KEeeK.......KEeeK....",
-    ".KEeeKK.....KKEeeK....",
-    ".KEEEKHHHHHHHKEEEK....",
-    "..KKHHHHHHHHHHHKK.....",
-    ".KHHHHHHHHHHHHHHHK....",
-    ".KHHHHHHHHHHHHHHHK....",
-    "KHHHHHHHHHHHHHHHHHK...",
-    "KHHHHHHHHHHHHHHHHHK...",
-    "KHHHHKKKKKKKKKHHHHK...",
-    "KHHHKSSSSSSSSSKHHHK...",
-    "KHHKSSSSSSSSSSSKHHK...",
-    ".KHKSSSSSSSSSSSKHKh...",
-    ".KKSSSSSSSSSSSSSKKh...",
-    ".KSSSSYSSSSSYSSSSK....",
-    ".KSSSSYSSSSSYSSSSK....",
-    ".KSSSSSSSSSSSSSSSK....",
-    ".KSPPSSSSSSSSSPPSK....",
-    ".KSSSSSSSMMSSSSSSK....",
-    "..KSSSSSSSSSSSSSK.....",
-    "..KKSSSSSSSSSSSKK.....",
-    "...KKSSSSSSSSSKK......",
+    "...KKK..........KKK.....",
+    "..KEEEK........KEEEK....",
+    ".KEeeeEK......KEeeeEK...",
+    ".KEeeeEKKKKKKKEeeeEK....",
+    ".KEEeEKHHHHHHHKEeEEK....",
+    "..KKKHHHHHHHHHHHHKKK....",
+    ".KHHHHHHHHHHHHHHHHHHK...",
+    ".KHHHHHHHHHHHHHHHHHHK...",
+    "KHHHHHHHHHHHHHHHHHHHHK..",
+    "KHHHHHHHHHHHHHHHHHHHHK..",
+    "KHHHHhSSSSSSSSSShHHHHK..",
+    "KHHHhSSSSSSSSSSSShHHHK..",
+    ".KHHhSSSSSSSSSSSShHHK...",
+    ".KHhSSSSSSSSSSSSSShHK...",
+    ".KHSSSSYYSSSSSSYYSHK....",
+    ".KHSSSSYYSSSSSSYYSHK....",
+    ".KSSSPPSSSSSSSSPPSSK....",
+    ".KSSSSSSSSSMMSSSSSSK....",
+    "..KSSSSSSSSSSSSSSSK.....",
+    "...KKSSSSSSSSSSSKK......",
 ]
 
-# ===== 胴＋脚（ポーズ別・幅22）=====
+# ===== 胴＋脚（ポーズ別・幅24）=====
 BODY_A = [
-    "....KKrRRRRRrKK......",
-    "...KRRRRRRRRRRRK.....",
-    "...KRWRRRRRRRWRK.....",
-    "...KRRRRRRRRRRRRK....",
-    "...KRRRRRRRRRRRRK....",
-    "...KrRRRRRRRRRRrK....",
-    "...KRRKKKKKKKKRRK....",
-    "...KRRK.....KRRRK....",
-    "..KSSK......KRRSK....",
-    "..KSSK......KSSSK....",
-    "..KBBBK.....KBBBK....",
-    "..KbbbK.....KbbbK....",
-    "...KKK.......KKK.....",
+    ".....KKWWWWWWWWKK.......",
+    "....KRRRRRRRRRRRRK......",
+    "...KRRRRRRRRRRRRRRK.....",
+    "..KRRRRRRRRRRRRRRRRK....",
+    "..KSRRRRRRRRRRRRRRSK....",
+    "...KrRRRRRRRRRRRRrK.....",
+    "....KKRRRRRRRRRRKK......",
+    ".....KRRK....KRRK.......",
+    "....KSSK......KSSK......",
+    "...KSSK........KSSK.....",
+    "..KBBBBK......KBBBBK....",
+    "..KKKKK........KKKKK....",
 ]
 BODY_B = [
-    "....KKrRRRRRrKK......",
-    "...KRRRRRRRRRRRK.....",
-    "...KRWRRRRRRRWRK.....",
-    "...KRRRRRRRRRRRRK....",
-    "...KRRRRRRRRRRRRK....",
-    "...KrRRRRRRRRRRrK....",
-    "...KRRKKKKKKKKRRK....",
-    "....KRRRK..KRRK......",
-    "....KRSSK..KSSK......",
-    ".....KSSK..KSSK......",
-    ".....KBBBK.KBBBK.....",
-    ".....KbbbK.KbbbK.....",
-    "......KKK...KKK......",
+    ".....KKWWWWWWWWKK.......",
+    "....KRRRRRRRRRRRRK......",
+    "...KRRRRRRRRRRRRRRK.....",
+    "..KRRRRRRRRRRRRRRRRK....",
+    "..KSRRRRRRRRRRRRRRSK....",
+    "...KrRRRRRRRRRRRRrK.....",
+    "....KKRRRRRRRRRRKK......",
+    "......KRRK..KRRK........",
+    "......KSSK..KSSK........",
+    ".......KSSK.KSSK........",
+    "......KBBBBKKBBBBK......",
+    "......KKKKK..KKKKK......",
 ]
 BODY_JUMP = [
-    "..KK.KKrRRRRRrKK.....",
-    ".KRRKKRRRRRRRRRK.....",
-    ".KRRRRRWRRRRRWRK.....",
-    "..KRRRRRRRRRRRRRK....",
-    "...KrRRRRRRRRRRrK....",
-    "....KRRRRRRRRRRK.....",
-    "....KRRKKKKKKRRK.....",
-    "...KRRK.....KRRRK....",
-    "..KSSK.......KRSK....",
-    "..KBBBK......KSSK....",
-    "..KbbbK.....KBBBK....",
-    "...KKK......KbbbK....",
-    "............KKKK.....",
+    ".....KKWWWWWWWWKK.......",
+    "....KRRRRRRRRRRRRK......",
+    "...KRRRRRRRRRRRRRRK.....",
+    "..KRRRRRRRRRRRRRRRRK....",
+    "..KSRRRRRRRRRRRRRRSK....",
+    "...KrRRRRRRRRRRRRrK.....",
+    "....KKRRRRRRRRRRKK......",
+    "...KRRK........KRRK.....",
+    "..KSSK..........KSSK....",
+    "..KBBBK.........KSSK....",
+    "..KKKKK........KBBBBK...",
+    "................KKKKK...",
 ]
-
-
-def bead_tile(col, small=False):
-    """1ビーズ = 丸角の正方タイル（フラット＋左上に控えめなツヤ1点）"""
-    t = Image.new("RGBA", (BEAD, BEAD), (0, 0, 0, 0))
-    d = ImageDraw.Draw(t)
-    d.rounded_rectangle((0, 0, BEAD - 1, BEAD - 1), radius=4, fill=col)
-    if small:
-        return t  # 目・口など小さな要素はフラットな塗り潰し
-    hl = tuple(min(255, c + 22) for c in col[:3]) + (110,)
-    d.rounded_rectangle((3, 3, 6, 6), radius=2, fill=hl)   # 左上の小さなツヤ
-    return t
 
 
 def build(body, name):
     grid = HEAD + body
     w = max(len(r) for r in grid)
     h = len(grid)
-    img = Image.new("RGBA", (w * BEAD, h * BEAD), (0, 0, 0, 0))
-    cache = {}
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    px = img.load()
     for y, row in enumerate(grid):
         for x, ch in enumerate(row):
             col = PAL.get(ch)
-            if not col:
-                continue
-            if ch not in cache:
-                cache[ch] = bead_tile(col, small=(ch in "KYMPb"))
-            img.alpha_composite(cache[ch], (x * BEAD, y * BEAD))
+            if col:
+                px[x, y] = col
     bbox = img.getchannel("A").getbbox()
     img = img.crop(bbox)
+    big = img.resize((img.width * SCALE, img.height * SCALE), Image.NEAREST)
     OUT.mkdir(parents=True, exist_ok=True)
-    img.save(OUT / name)
-    print(f"wrote {OUT / name} ({img.width}x{img.height})")
+    big.save(OUT / name)
+    print(f"wrote {OUT / name} ({big.width}x{big.height})")
 
 
 if __name__ == "__main__":

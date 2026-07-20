@@ -99,6 +99,7 @@ export class GameOverScene extends Phaser.Scene {
     addFullscreenButton(this, GAME_WIDTH - 36, 92);
 
     AudioBox.play(data.isNewBest ? 'win' : 'lose');
+    if (data.isNewBest) AudioBox.voice('yay'); // ボイスが配置されていれば「やったー！」
     if (data.isNewBest) {
       const confetti = this.add.particles(0, 0, 'sparkle', {
         x: { min: 0, max: GAME_WIDTH },
