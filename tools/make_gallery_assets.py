@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""せなくま美術館（ピーチ城）の背景・パーツ素材を生成する。
+"""せなくま美術館（ピーチ城）の素材を生成する。
 
-スーパーマリオ64のピーチ城を参考に、外観（城・堀・橋・滝）、
-城内ホール（白黒チェック床・太陽のモザイク・赤い絨毯の大階段・雲の壁）、
-絵画の部屋、金の額縁（9スライス）、扉、星の扉などを Pillow で描く。
+スーパーマリオ64のピーチ城を参考にした
+  1) 城の外観（タイトル画面）: 灰白色の石壁・赤い屋根瓦・四隅の塔・二段の中央塔・
+     正面のピーチ姫ステンドグラス・堀と石橋・滝
+  2) 城内ホール(3D)用テクスチャ: 白黒チェック床、太陽のモザイク絨毯（橙と紫の光線）、
+     石の腰壁、「青空・雲・緑の丘」の壁画、天井、木の扉（星の扉）、アーチ窓、絨毯
+を Pillow で描く。
 
 使い方:
     pip install Pillow numpy
@@ -29,23 +32,23 @@ FINAL = 2  # 出力倍率（1920×1080）
 random.seed(64)
 
 # ---- 色 ----------------------------------------------------------------
-SKY_TOP = (86, 150, 236)
-SKY_BOT = (176, 216, 250)
+SKY_TOP = (78, 146, 236)
+SKY_BOT = (172, 214, 250)
 GRASS = (96, 172, 72)
 GRASS_DARK = (74, 146, 58)
 GRASS_LIGHT = (122, 196, 92)
-STONE = (232, 226, 210)
-STONE_SHADE = (206, 198, 180)
-STONE_LINE = (196, 186, 166)
-ROOF = (214, 62, 52)
-ROOF_DARK = (166, 42, 38)
-ROOF_LIGHT = (236, 96, 82)
+STONE = (226, 224, 216)  # 灰白色の石（マリオ64の城壁）
+STONE_SHADE = (196, 194, 186)
+STONE_LINE = (184, 182, 174)
+ROOF = (208, 58, 48)
+ROOF_DARK = (160, 40, 36)
+ROOF_LIGHT = (232, 92, 78)
 WOOD = (118, 72, 42)
 WOOD_DARK = (84, 50, 30)
+WOOD_LIGHT = (150, 98, 58)
 WATER = (58, 122, 214)
 WATER_LIGHT = (128, 182, 240)
 CLOUD = (255, 255, 255)
-WALL_BLUE = (150, 196, 240)
 WALL_CREAM = (238, 226, 198)
 WALL_CREAM_DARK = (214, 198, 164)
 CARPET = (188, 34, 44)
@@ -102,7 +105,6 @@ def line(d, seq, fill, width=1):
 
 
 def vgrad(w, h, top, bottom) -> Image.Image:
-    """縦グラデーション（numpy）"""
     t = np.linspace(0, 1, h, dtype=np.float32)[:, None, None]
     a = np.array(top, dtype=np.float32)[None, None, :]
     b = np.array(bottom, dtype=np.float32)[None, None, :]
@@ -112,7 +114,7 @@ def vgrad(w, h, top, bottom) -> Image.Image:
 
 
 def cloud(d, cx, cy, w, color=CLOUD, shade=(214, 228, 246)):
-    """ふわふわの雲（楕円の集合）"""
+    """ふわふわの雲（楕円の集合・下側に影）"""
     h = w * 0.42
     parts = [(0, 0, 0.5, 0.5), (-0.32, 0.12, 0.34, 0.34), (0.3, 0.1, 0.36, 0.36), (-0.1, -0.12, 0.36, 0.36), (0.14, -0.08, 0.3, 0.3)]
     for ox, oy, rx, ry in parts:
@@ -122,7 +124,6 @@ def cloud(d, cx, cy, w, color=CLOUD, shade=(214, 228, 246)):
 
 
 def bricks(d, x0, y0, x1, y1, bw=14, bh=8, color=STONE_LINE):
-    """石壁の目地（横線＋互い違いの縦線）"""
     y = y0
     row = 0
     while y < y1:
@@ -137,18 +138,15 @@ def bricks(d, x0, y0, x1, y1, bw=14, bh=8, color=STONE_LINE):
 
 
 def cone_roof(d, cx, top_y, base_y, half_w):
-    """円錐屋根（左右で明暗）"""
     poly(d, [(cx, top_y), (cx - half_w, base_y), (cx, base_y)], ROOF_LIGHT)
     poly(d, [(cx, top_y), (cx + half_w, base_y), (cx, base_y)], ROOF_DARK)
     poly(d, [(cx, top_y), (cx - half_w * 0.35, base_y), (cx + half_w * 0.2, base_y)], ROOF)
-    # 屋根瓦の段
-    n = 6
+    n = 7
     for i in range(1, n):
         t = i / n
         y = top_y + (base_y - top_y) * t
         hw = half_w * t
         line(d, [(cx - hw, y), (cx + hw, y)], ROOF_DARK, 0.6)
-    # 先端の飾り
     ell(d, cx, top_y - 1, 1.8, 1.8, GOLD)
 
 
@@ -157,23 +155,7 @@ def flag(d, x, y, h=16):
     poly(d, [(x, y - h), (x + 10, y - h + 3.5), (x, y - h + 7)], (240, 60, 60))
 
 
-def tower(d, cx, top_y, base_y, w, roof_h, windows=2):
-    """円塔（胴体＋円錐屋根＋窓）"""
-    hw = w / 2
-    rect(d, cx - hw, top_y, cx + hw, base_y, STONE)
-    rect(d, cx + hw * 0.45, top_y, cx + hw, base_y, STONE_SHADE)
-    bricks(d, cx - hw, top_y, cx + hw, base_y)
-    # 屋根の張り出し（コーニス）
-    rect(d, cx - hw - 3, top_y - 3, cx + hw + 3, top_y + 1, STONE_SHADE)
-    cone_roof(d, cx, top_y - roof_h, top_y - 2, hw + 5)
-    flag(d, cx, top_y - roof_h - 1)
-    for i in range(windows):
-        wy = top_y + 18 + i * 28
-        arch_window(d, cx, wy, 5, 12)
-
-
 def arch_window(d, cx, cy, hw, hh, glass=(70, 100, 170), frame=WOOD_DARK):
-    """上が丸い縦長窓"""
     rect(d, cx - hw - 1, cy - hh + hw, cx + hw + 1, cy + hh, frame)
     ell(d, cx, cy - hh + hw, hw + 1, hw + 1, frame)
     rect(d, cx - hw, cy - hh + hw, cx + hw, cy + hh, glass)
@@ -182,40 +164,45 @@ def arch_window(d, cx, cy, hw, hh, glass=(70, 100, 170), frame=WOOD_DARK):
     line(d, [(cx - hw, cy), (cx + hw, cy)], frame, 0.8)
 
 
+def tower(d, cx, top_y, base_y, w, roof_h, windows=2):
+    hw = w / 2
+    rect(d, cx - hw, top_y, cx + hw, base_y, STONE)
+    rect(d, cx + hw * 0.45, top_y, cx + hw, base_y, STONE_SHADE)
+    bricks(d, cx - hw, top_y, cx + hw, base_y)
+    rect(d, cx - hw - 3, top_y - 3, cx + hw + 3, top_y + 1, STONE_SHADE)
+    cone_roof(d, cx, top_y - roof_h, top_y - 2, hw + 5)
+    flag(d, cx, top_y - roof_h - 1)
+    for i in range(windows):
+        wy = top_y + 18 + i * 28
+        arch_window(d, cx, wy, 5, 12)
+
+
 def stained_glass_peach(d, cx, cy, hw, hh):
     """ピーチ姫のステンドグラス（上が丸い窓）。青地に金の縁、ピンクのドレス。"""
     top = cy - hh
-    # 枠
     rect(d, cx - hw - 2.5, top + hw, cx + hw + 2.5, cy + hh, GOLD_DARK)
     ell(d, cx, top + hw, hw + 2.5, hw + 2.5, GOLD_DARK)
     rect(d, cx - hw, top + hw, cx + hw, cy + hh, (38, 74, 168))
     ell(d, cx, top + hw, hw, hw, (38, 74, 168))
-    # 背景の光のパネル（放射状）
     for i in range(6):
         t = i / 6
         c = lerp((70, 120, 210), (40, 80, 180), t)
         y0 = top + hw + (2 * hh - hw) * t
         rect(d, cx - hw, y0, cx + hw, min(cy + hh, y0 + (2 * hh - hw) / 6 + 0.5), c)
-    # ピーチ：ドレス（台形＋裾）、胴、顔、髪、王冠
     dress_top = cy - hh * 0.05
     poly(d, [(cx - hw * 0.28, dress_top), (cx + hw * 0.28, dress_top), (cx + hw * 0.8, cy + hh - 2), (cx - hw * 0.8, cy + hh - 2)], (244, 120, 176))
     poly(d, [(cx - hw * 0.12, dress_top), (cx + hw * 0.12, dress_top), (cx + hw * 0.36, cy + hh - 2), (cx - hw * 0.36, cy + hh - 2)], (252, 168, 206))
-    ell(d, cx, cy + hh * 0.05, hw * 0.34, hw * 0.16, (236, 96, 150))  # 腰のリボン
-    # 手（白手袋）
+    ell(d, cx, cy + hh * 0.05, hw * 0.34, hw * 0.16, (236, 96, 150))
     ell(d, cx - hw * 0.42, cy + hh * 0.22, hw * 0.13, hw * 0.13, (255, 255, 255))
     ell(d, cx + hw * 0.42, cy + hh * 0.22, hw * 0.13, hw * 0.13, (255, 255, 255))
-    # 顔と髪
     face_y = cy - hh * 0.42
-    ell(d, cx, face_y - hw * 0.05, hw * 0.34, hw * 0.4, (250, 214, 96))  # 髪の外形
-    ell(d, cx, face_y, hw * 0.24, hw * 0.27, (255, 224, 196))  # 顔
+    ell(d, cx, face_y - hw * 0.05, hw * 0.34, hw * 0.4, (250, 214, 96))
+    ell(d, cx, face_y, hw * 0.24, hw * 0.27, (255, 224, 196))
     ell(d, cx - hw * 0.1, face_y - hw * 0.02, hw * 0.035, hw * 0.05, (60, 90, 160))
     ell(d, cx + hw * 0.1, face_y - hw * 0.02, hw * 0.035, hw * 0.05, (60, 90, 160))
-    # 前髪
     poly(d, [(cx - hw * 0.28, face_y - hw * 0.1), (cx - hw * 0.05, face_y - hw * 0.3), (cx + hw * 0.3, face_y - hw * 0.12), (cx + hw * 0.24, face_y - hw * 0.34), (cx - hw * 0.3, face_y - hw * 0.3)], (250, 214, 96))
-    # 王冠
     poly(d, [(cx - hw * 0.16, face_y - hw * 0.34), (cx - hw * 0.1, face_y - hw * 0.5), (cx, face_y - hw * 0.4), (cx + hw * 0.1, face_y - hw * 0.5), (cx + hw * 0.16, face_y - hw * 0.34)], GOLD)
     ell(d, cx, face_y - hw * 0.4, hw * 0.035, hw * 0.035, (60, 160, 240))
-    # 鉛線（ステンドグラスの格子）
     for i in range(1, 4):
         y = top + hw + (2 * hh - hw) * i / 4
         line(d, [(cx - hw, y), (cx + hw, y)], (30, 30, 40), 0.5)
@@ -242,17 +229,16 @@ def hills_band(d, y_base, amp, color, seed, height=60):
 
 
 # ======================================================================
-# 1. 外観
+# 1. 外観（タイトル画面）
 # ======================================================================
 def make_outside() -> None:
     img = vgrad(GW * S, GH * S, SKY_TOP, SKY_BOT)
     d = ImageDraw.Draw(img)
-
-    # 雲
     for cx, cy, w in [(110, 70, 120), (340, 50, 90), (600, 90, 140), (850, 60, 110), (760, 170, 80), (200, 150, 70), (470, 30, 60)]:
         cloud(d, cx, cy, w)
 
-    # 遠景の丘 → 近景の丘（城は丘の上の平地に建つ）
+    # 城の背後の高い丘（マリオ64の城は丘に囲まれた谷にある）
+    hills_band(d, 330, 22, (108, 182, 98), 7, 110)
     hills_band(d, 345, 14, (120, 190, 110), 1, 60)
     hills_band(d, 355, 10, (104, 178, 88), 2, 36)
     rect(d, 0, 345, GW, GH, GRASS)
@@ -260,46 +246,47 @@ def make_outside() -> None:
     # 右手の丘と滝
     poly(d, [(690, 400), (720, 300), (790, 268), (900, 258), (GW, 262), (GW, 420)], GRASS_DARK)
     poly(d, [(720, 400), (740, 312), (800, 285), (GW, 280), (GW, 420)], GRASS)
-    # 崖面（岩）
     poly(d, [(770, 398), (778, 312), (846, 302), (852, 398)], (150, 132, 112))
     for i in range(6):
         line(d, [(774 + i * 2, 318 + i * 13), (848, 316 + i * 13)], (126, 108, 92), 0.7)
-    # 滝
     rect(d, 790, 305, 832, 400, (176, 212, 248))
     for i in range(9):
         x = 792 + i * 4.5
         line(d, [(x, 306), (x, 400)], (236, 246, 255) if i % 2 == 0 else (150, 194, 240), 1.4)
-    # 滝の水しぶき
     for i in range(7):
         ell(d, 792 + i * 7, 401, 6, 3, (236, 246, 255))
 
     # ---- 城 -------------------------------------------------------------
     cx = 480
     base = 392
-    # 後方の塔（中央の大塔＋左右の塔）
-    tower(d, cx, 128, 300, 66, 62, windows=3)
-    tower(d, cx - 108, 178, 300, 44, 40, windows=1)
-    tower(d, cx + 108, 178, 300, 44, 40, windows=1)
+    # 中央の二段の塔（下段が太く、上段が細い）
+    tower(d, cx, 196, 300, 96, 0, windows=0)  # 下段（屋根なし・胴体のみ）
+    rect(d, cx - 52, 192, cx + 52, 198, STONE_SHADE)  # 下段上端のコーニス
+    for i in range(-3, 4):  # 下段の胸壁（凸凹）
+        rect(d, cx + i * 14 - 5, 184, cx + i * 14 + 5, 194, STONE)
+    poly(d, [(cx - 54, 196), (cx + 54, 196), (cx + 40, 176), (cx - 40, 176)], ROOF)  # 下段の腰屋根
+    tower(d, cx, 112, 180, 60, 60, windows=2)  # 上段
+    # 後方の左右の塔
+    tower(d, cx - 118, 176, 300, 44, 40, windows=1)
+    tower(d, cx + 118, 176, 300, 44, 40, windows=1)
     # 本体（腰屋根 + 壁）
-    poly(d, [(340, 246), (620, 246), (598, 214), (362, 214)], ROOF)
-    poly(d, [(340, 246), (362, 214), (355, 214), (332, 246)], ROOF_DARK)
-    for i in range(1, 5):
-        y = 214 + i * 6.4
-        line(d, [(362 - (i * 4.4), y), (598 + (i * 4.4), y)], ROOF_DARK, 0.6)
-    rect(d, 332, 246, 628, base, STONE)
-    rect(d, 332, 246, 628, 251, STONE_SHADE)  # コーニス
-    bricks(d, 332, 251, 628, base)
-    # 本体の窓
-    for wx in (372, 404, 556, 588):
+    poly(d, [(330, 246), (630, 246), (606, 212), (354, 212)], ROOF)
+    for i in range(1, 6):
+        y = 212 + i * 5.6
+        line(d, [(354 - (i * 4.6), y), (606 + (i * 4.6), y)], ROOF_DARK, 0.6)
+    rect(d, 322, 246, 638, base, STONE)
+    rect(d, 322, 246, 638, 251, STONE_SHADE)
+    bricks(d, 322, 251, 638, base)
+    for wx in (366, 400, 560, 594):
         arch_window(d, wx, 300, 6, 16)
-    # 正面の切妻（ステンドグラスの壁）
-    poly(d, [(cx, 152), (cx - 62, 246), (cx + 62, 246)], ROOF)
-    poly(d, [(cx, 152), (cx + 62, 246), (cx + 50, 246), (cx, 168)], ROOF_DARK)
-    poly(d, [(cx, 166), (cx - 50, 246), (cx + 50, 246)], STONE)
-    rect(d, cx - 56, 246, cx + 56, base, STONE)
-    bricks(d, cx - 56, 246, cx + 56, base)
-    poly(d, [(cx, 166), (cx - 50, 246), (cx + 50, 246)], None, outline=STONE_LINE, width=0.6)
-    stained_glass_peach(d, cx, 250, 20, 38)
+    # 正面の切妻とステンドグラス
+    poly(d, [(cx, 150), (cx - 64, 246), (cx + 64, 246)], ROOF)
+    poly(d, [(cx, 150), (cx + 64, 246), (cx + 52, 246), (cx, 166)], ROOF_DARK)
+    poly(d, [(cx, 166), (cx - 52, 246), (cx + 52, 246)], STONE)
+    rect(d, cx - 58, 246, cx + 58, base, STONE)
+    bricks(d, cx - 58, 246, cx + 58, base)
+    poly(d, [(cx, 166), (cx - 52, 246), (cx + 52, 246)], None, outline=STONE_LINE, width=0.6)
+    stained_glass_peach(d, cx, 250, 21, 40)
     # 玄関（アーチの両開き扉）
     dx0, dx1, dtop = cx - 26, cx + 26, 318
     rect(d, dx0 - 4, dtop + 26, dx1 + 4, base, STONE_SHADE)
@@ -311,18 +298,16 @@ def make_outside() -> None:
         line(d, [(dx0, yy), (dx1, yy)], WOOD_DARK, 0.8)
     ell(d, cx - 5, 362, 1.6, 1.6, GOLD)
     ell(d, cx + 5, 362, 1.6, 1.6, GOLD)
-    # 前面の隅塔
-    tower(d, 332, 214, base + 2, 60, 56, windows=2)
-    tower(d, 628, 214, base + 2, 60, 56, windows=2)
+    # 四隅の塔（前面2本）
+    tower(d, 322, 212, base + 2, 60, 56, windows=2)
+    tower(d, 638, 212, base + 2, 60, 56, windows=2)
 
     # ---- 堀・芝・橋 ----------------------------------------------------
-    # 堀（城の手前をぐるりと。曲線で奥行き）
     poly(d, [(0, 404), (200, 396), (330, 394), (630, 394), (760, 396), (GW, 404), (GW, 452), (700, 446), (480, 444), (260, 446), (0, 452)], WATER)
     for i in range(14):
         x = 20 + i * 68
         y = 410 + (i % 3) * 11
         line(d, [(x, y), (x + 34, y)], WATER_LIGHT, 1.1)
-    # 手前の芝
     poly(d, [(0, 452), (260, 446), (480, 444), (700, 446), (GW, 452), (GW, GH), (0, GH)], GRASS)
     for i in range(30):
         x = random.uniform(0, GW)
@@ -330,382 +315,277 @@ def make_outside() -> None:
         if 330 < x < 630:
             continue
         line(d, [(x, y), (x + 4, y - 5), (x + 8, y)], GRASS_LIGHT, 0.8)
-    # 参道（石畳）と橋
-    poly(d, [(380, GH), (580, GH), (516, 446), (444, 446)], (196, 186, 166))
-    poly(d, [(444, 446), (516, 446), (508, 394), (452, 394)], (212, 204, 186))  # 橋面
-    poly(d, [(436, 448), (450, 448), (458, 392), (448, 392)], (170, 160, 142))  # 左欄干
-    poly(d, [(510, 448), (524, 448), (512, 392), (502, 392)], (170, 160, 142))  # 右欄干
+    poly(d, [(380, GH), (580, GH), (516, 446), (444, 446)], (196, 190, 176))
+    poly(d, [(444, 446), (516, 446), (508, 394), (452, 394)], (212, 208, 196))
+    poly(d, [(436, 448), (450, 448), (458, 392), (448, 392)], (170, 166, 154))
+    poly(d, [(510, 448), (524, 448), (512, 392), (502, 392)], (170, 166, 154))
     for i in range(6):
         y = 400 + i * 9
         t = (y - 394) / 52
-        line(d, [(452 - 8 * t, y), (508 + 8 * t, y)], (186, 176, 158), 0.7)
+        line(d, [(452 - 8 * t, y), (508 + 8 * t, y)], (186, 182, 170), 0.7)
     for i in range(8):
         y = 452 + i * 12
         t = i / 8
-        line(d, [(444 - 64 * t, y), (516 + 64 * t, y)], (178, 168, 150), 0.7)
-
-    # 木々
+        line(d, [(444 - 64 * t, y), (516 + 64 * t, y)], (178, 172, 160), 0.7)
     for x, y, r in [(70, 393, 22), (160, 390, 18), (250, 393, 16), (880, 470, 20), (700, 388, 14), (130, 505, 26), (830, 510, 26)]:
         tree(d, x, y, r)
-
     save(finish(img), "outside.png")
 
 
 # ======================================================================
-# 2. 城内ホール（1点透視）
+# 2. 3D ホール用テクスチャ
 # ======================================================================
-VX, VY = 480, 235  # 消失点
+def noise_img(w, h, amount=6, seed=1) -> Image.Image:
+    rnd = np.random.default_rng(seed)
+    n = rnd.integers(-amount, amount + 1, size=(h, w, 1))
+    return n
 
 
-def checker_floor(img: Image.Image, y_top: float, cam_h: float = 150.0, tile: float = 46.0, focal: float = 300.0, sun=None) -> None:
-    """白黒チェック床を透視投影でピクセル描画（numpy）。sun=(wx,wz,r)で太陽モザイクを重ねる。"""
-    W, H = img.size
-    ys = np.arange(int(y_top * FINAL), H, dtype=np.float32)
-    xs = np.arange(0, W, dtype=np.float32)
-    Y, X = np.meshgrid(ys, xs, indexing="ij")
-    vx, vy = VX * FINAL, VY * FINAL
-    f = focal * FINAL
-    dy = np.maximum(Y - vy, 0.5)
-    z = f * (cam_h * FINAL) / dy  # 奥行き
-    wx = (X - vx) * z / f  # 横位置
-    ix = np.floor(wx / (tile * FINAL)).astype(np.int64)
-    iz = np.floor(z / (tile * FINAL)).astype(np.int64)
-    parity = (ix + iz) & 1
-    col = np.where(parity[..., None] == 0, np.array(TILE_W, np.float32), np.array(TILE_B, np.float32))
+def apply_noise(img: Image.Image, amount=6, seed=1) -> Image.Image:
+    arr = np.array(img.convert("RGBA")).astype(np.int16)
+    arr[..., :3] = np.clip(arr[..., :3] + noise_img(img.width, img.height, amount, seed), 0, 255)
+    return Image.fromarray(arr.astype(np.uint8), "RGBA")
+
+
+def make_floor_tile() -> None:
+    """白黒チェック（2×2で1枚。繰り返して敷く）"""
+    n = 512
+    img = Image.new("RGBA", (n, n), TILE_W + (255,))
+    d = ImageDraw.Draw(img)
+    h = n // 2
+    d.rectangle((h, 0, n, h), fill=TILE_B + (255,))
+    d.rectangle((0, h, h, n), fill=TILE_B + (255,))
     # 目地
-    fx = np.abs((wx / (tile * FINAL)) % 1 - 0.5)
-    fz = np.abs((z / (tile * FINAL)) % 1 - 0.5)
-    grout = (fx > 0.47) | (fz > 0.47)
-    col = np.where(grout[..., None], np.array((150, 146, 140), np.float32), col)
-    # 奥ほど暗く（空気遠近）
-    shade = np.clip(1.0 - (z / (tile * FINAL)) * 0.012, 0.55, 1.0)[..., None]
-    col = col * shade
-    if sun is not None:
-        swx, swz, r = sun
-        dist = np.sqrt((wx - swx * FINAL) ** 2 + (z - swz * FINAL) ** 2) / (r * FINAL)
-        ang = np.arctan2(z - swz * FINAL, wx - swx * FINAL)
-        ray = 0.72 + 0.16 * np.cos(ang * 12)
-        outer = dist < 1.0
-        ring = (dist > 0.92) & (dist < 1.0)
-        sunray = (dist < ray) & (dist >= 0.44)
-        disc = dist < 0.44
-        face_ring = (dist > 0.4) & (dist < 0.44)
-        col = np.where(outer[..., None], np.array((246, 226, 150), np.float32) * shade, col)
-        col = np.where(sunray[..., None], np.array((242, 150, 48), np.float32) * shade, col)
-        col = np.where(disc[..., None], np.array((252, 204, 72), np.float32) * shade, col)
-        col = np.where(face_ring[..., None], np.array((214, 110, 36), np.float32) * shade, col)
-        col = np.where(ring[..., None], np.array((160, 68, 40), np.float32) * shade, col)
-    arr = np.array(img)
-    arr[int(y_top * FINAL):, :, :3] = np.clip(col, 0, 255).astype(np.uint8)
-    arr[int(y_top * FINAL):, :, 3] = 255
-    img.paste(Image.fromarray(arr, "RGBA"))
-
-
-def cloud_wall(d, x0, y0, x1, y1, seed=3):
-    rect(d, x0, y0, x1, y1, WALL_BLUE)
-    rnd = random.Random(seed)
-    for _ in range(int((x1 - x0) * (y1 - y0) / 6000) + 2):
-        cx = rnd.uniform(x0, x1)
-        cy = rnd.uniform(y0 + 10, y1 - 6)
-        cloud(d, cx, cy, rnd.uniform(40, 70), (236, 244, 252), (206, 226, 246))
-
-
-def cloud_wall_poly(d, quad, seed=3):
-    """任意四角形の雲の壁（マスクで切り抜く）"""
-    x0 = min(p[0] for p in quad)
-    x1 = max(p[0] for p in quad)
-    y0 = min(p[1] for p in quad)
-    y1 = max(p[1] for p in quad)
-    layer = canvas()
-    ld = ImageDraw.Draw(layer)
-    cloud_wall(ld, x0, y0, x1, y1, seed)
-    mask = Image.new("L", layer.size, 0)
-    ImageDraw.Draw(mask).polygon(pts(quad), fill=255)
-    d._image.paste(layer, (0, 0), mask)
-
-
-def door(d, cx, bottom, w, h, star: int | None = None, big=False):
-    """木の扉（上部アーチ）。star を指定すると星の扉。"""
-    hw = w / 2
-    top = bottom - h
-    # 枠
-    rect(d, cx - hw - 3, top + hw, cx + hw + 3, bottom, WALL_CREAM_DARK)
-    ell(d, cx, top + hw, hw + 3, hw + 3, WALL_CREAM_DARK)
-    rect(d, cx - hw, top + hw, cx + hw, bottom, WOOD)
-    ell(d, cx, top + hw, hw, hw, WOOD)
-    line(d, [(cx, top), (cx, bottom)], WOOD_DARK, 1)
-    for i in range(1, 3):
-        y = top + hw + (h - hw) * i / 3
-        line(d, [(cx - hw, y), (cx + hw, y)], WOOD_DARK, 0.7)
-    ell(d, cx - 3, bottom - h * 0.45, 1.3, 1.3, GOLD)
-    ell(d, cx + 3, bottom - h * 0.45, 1.3, 1.3, GOLD)
-    if star is not None:
-        r = hw * (0.7 if big else 0.55)
-        sy = top + hw + 2
-        star_shape(d, cx, sy + r * 0.1, r, GOLD_LIGHT, GOLD_DARK)
-
-
-def star_shape(d, cx, cy, r, fill, outline=None):
-    seq = []
+    g = (150, 146, 140, 255)
+    for v in (0, h, n - 1):
+        d.line((v, 0, v, n), fill=g, width=4)
+        d.line((0, v, n, v), fill=g, width=4)
+    # ほんのり大理石の筋
     for i in range(10):
-        a = -math.pi / 2 + i * math.pi / 5
-        rr = r if i % 2 == 0 else r * 0.45
-        seq.append((cx + math.cos(a) * rr, cy + math.sin(a) * rr))
-    poly(d, seq, fill, outline=outline, width=0.8 if outline else 0)
+        x0, y0 = random.uniform(0, n), random.uniform(0, n)
+        x1, y1 = x0 + random.uniform(-50, 50), y0 + random.uniform(-50, 50)
+        d.line((x0, y0, x1, y1), fill=(255, 255, 255, 18), width=2)
+    save(apply_noise(img, 3, 2), "tex_floor.png")
 
 
-def sconce(d, x, y, k=1.0):
-    """壁付きの金の燭台（ろうそくの灯り付き）"""
-    rect(d, x - 1.5 * k, y, x + 1.5 * k, y + 26 * k, GOLD_DARK)
-    poly(d, [(x - 8 * k, y + 4 * k), (x + 8 * k, y + 4 * k), (x, y + 14 * k)], GOLD)
-    ell(d, x, y - 4 * k, 3.2 * k, 5 * k, (255, 214, 96))
-    ell(d, x, y - 6 * k, 1.6 * k, 2.6 * k, (255, 250, 220))
-
-
-def pillar(d, x, top, bottom, w=12):
-    rect(d, x - w / 2, top, x + w / 2, bottom, (250, 246, 236))
-    rect(d, x + w / 2 - 3, top, x + w / 2, bottom, (214, 206, 190))
-    rect(d, x - w / 2 - 3, top - 3, x + w / 2 + 3, top + 5, (240, 234, 220))
-    rect(d, x - w / 2 - 3, bottom - 6, x + w / 2 + 3, bottom, (240, 234, 220))
-
-
-def make_foyer() -> None:
-    img = canvas()
+def make_sun_rug() -> None:
+    """太陽のモザイク絨毯: 橙と紫の光線（マリオ64の1階ホール中央）"""
+    n = 1024
+    img = Image.new("RGBA", (n, n), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    # 天井（消失点に向かう台形）
-    poly(d, [(0, 0), (GW, 0), (700, 96), (260, 96)], (250, 240, 222))
-    for i in range(1, 8):
-        t = i / 8
-        line(d, [(0 + 260 * t, 96 * t), (GW - 260 * t, 96 * t)], (230, 218, 196), 0.8)
-    # 側壁（雲の壁）
-    cloud_wall_poly(d, [(0, 0), (260, 96), (260, 300), (0, 372)], seed=11)
-    cloud_wall_poly(d, [(GW, 0), (700, 96), (700, 300), (GW, 372)], seed=12)
-    # 側壁の腰壁（クリーム）
-    poly(d, [(0, 372), (260, 300), (260, 330), (0, 420)], WALL_CREAM)
-    poly(d, [(GW, 372), (700, 300), (700, 330), (GW, 420)], WALL_CREAM)
-    line(d, [(0, 372), (260, 300)], WALL_CREAM_DARK, 1.6)
-    line(d, [(GW, 372), (700, 300)], WALL_CREAM_DARK, 1.6)
-    # 側壁の燭台（透視に合わせて奥ほど小さく）
-    for x, y, k in [(70, 200, 1.0), (150, 205, 0.85), (215, 208, 0.7), (GW - 70, 200, 1.0), (GW - 150, 205, 0.85), (GW - 215, 208, 0.7)]:
-        sconce(d, x, y, k)
-
-    # 奥の壁
-    cloud_wall(d, 260, 96, 700, 300, seed=13)
-    rect(d, 260, 232, 700, 330, WALL_CREAM)  # 1階の腰壁
-    line(d, [(260, 232), (700, 232)], WALL_CREAM_DARK, 1.6)
-    bricks(d, 260, 234, 700, 330, bw=22, bh=11, color=(226, 212, 182))
-    # 中2階バルコニー（手すり）
-    rect(d, 260, 210, 700, 216, (250, 246, 236))
-    rect(d, 260, 216, 700, 232, (240, 232, 214))
-    for x in range(268, 700, 12):
-        rect(d, x - 2, 216, x + 2, 232, (224, 214, 192))
-    # 柱
-    for x in (262, 700):
-        pillar(d, x, 96, 330, 10)
-    for x in (340, 620):
-        pillar(d, x, 96, 232, 8)
-
-    # ---- 大階段（赤い絨毯）: 床から中2階の踊り場へ ----
-    steps = 9
-    y_bot, y_top = 372, 254
-    w_bot, w_top = 150, 96
-    for i in range(steps):
-        t0 = i / steps
-        t1 = (i + 1) / steps
-        ya = y_bot - (y_bot - y_top) * t0
-        yb = y_bot - (y_bot - y_top) * t1
-        wa = w_bot - (w_bot - w_top) * t0
-        wb = w_bot - (w_bot - w_top) * t1
-        # 蹴込み（暗い）+ 踏み面（明るい）
-        poly(d, [(VX - wa, ya), (VX + wa, ya), (VX + wb, yb + (ya - yb) * 0.45), (VX - wb, yb + (ya - yb) * 0.45)], CARPET_DARK)
-        poly(d, [(VX - wb, yb + (ya - yb) * 0.45), (VX + wb, yb + (ya - yb) * 0.45), (VX + wb, yb), (VX - wb, yb)], CARPET)
-        # 金の縁取り（絨毯の端）
-        line(d, [(VX - wa + 8, ya), (VX - wb + 8, yb)], CARPET_EDGE, 0.8)
-        line(d, [(VX + wa - 8, ya), (VX + wb - 8, yb)], CARPET_EDGE, 0.8)
-    # 階段の石の側壁
-    poly(d, [(VX - w_bot, y_bot), (VX - w_bot - 16, y_bot), (VX - w_top - 12, y_top), (VX - w_top, y_top)], (222, 214, 196))
-    poly(d, [(VX + w_bot, y_bot), (VX + w_bot + 16, y_bot), (VX + w_top + 12, y_top), (VX + w_top, y_top)], (206, 198, 180))
-    # 踊り場（赤い絨毯）と大きな星の扉の壁
-    rect(d, VX - 120, 232, VX + 120, 254, CARPET)
-    rect(d, VX - 120, 232, VX + 120, 254, None, outline=CARPET_EDGE, width=0.8)
-    rect(d, VX - 132, 120, VX + 132, 232, WALL_CREAM)
-    bricks(d, VX - 132, 120, VX + 132, 232, bw=22, bh=11, color=(226, 212, 182))
-    rect(d, VX - 136, 116, VX + 136, 122, (250, 246, 236))
-    # 大きな星の扉
-    door(d, VX, 232, 64, 96, star=8, big=True)
-
-    # 1階の扉（左右）。ホール奥壁の腰壁に配置
-    door(d, 300, 330, 40, 74, star=0)
-    door(d, 660, 330, 40, 74, star=0)
-    # 中2階の扉（左右）
-    door(d, 300, 210, 34, 64, star=0)
-    door(d, 660, 210, 34, 64, star=0)
-    # 扉前の赤い絨毯（床への短いランナー）
-    for cx in (300, 660):
-        poly(d, [(cx - 24, 330), (cx + 24, 330), (cx + 36, 372), (cx - 36, 372)], CARPET)
-        poly(d, [(cx - 24, 330), (cx + 24, 330), (cx + 36, 372), (cx - 36, 372)], None, outline=CARPET_EDGE, width=0.8)
-
-    # 床（透視チェック＋太陽のモザイク）
-    out = finish(img)
-    checker_floor(out, 330, cam_h=150, tile=46, focal=300, sun=(0, 330, 150))
-    # 側壁の腰壁と床の境界に影
-    d2 = ImageDraw.Draw(out)
-    sh = Image.new("RGBA", out.size, (0, 0, 0, 0))
-    sd = ImageDraw.Draw(sh)
-    sd.polygon([(0, 420 * FINAL), (260 * FINAL, 330 * FINAL), (700 * FINAL, 330 * FINAL), (GW * FINAL, 420 * FINAL), (GW * FINAL, 440 * FINAL), (700 * FINAL, 345 * FINAL), (260 * FINAL, 345 * FINAL), (0, 440 * FINAL)], fill=(0, 0, 0, 70))
-    sh = sh.filter(ImageFilter.GaussianBlur(6))
-    out.alpha_composite(sh)
-    del d2
-    save(out, "foyer.png")
+    c = n / 2
+    R = n * 0.48
+    d.ellipse((c - R, c - R, c + R, c + R), fill=(120, 52, 36, 255))  # 外縁（濃い赤茶）
+    R2 = R * 0.94
+    d.ellipse((c - R2, c - R2, c + R2, c + R2), fill=(238, 214, 150, 255))  # 生成り
+    # 光線 16本: 橙と紫を交互に。外側ほど細くなる三角
+    rays = 16
+    for i in range(rays):
+        a0 = i * 2 * math.pi / rays
+        col = (236, 132, 40, 255) if i % 2 == 0 else (118, 72, 160, 255)
+        w = 2 * math.pi / rays * 0.5
+        r_in = R * 0.30
+        r_out = R * 0.88 if i % 2 == 0 else R * 0.78
+        p = [(c + math.cos(a0 - w) * r_in, c + math.sin(a0 - w) * r_in),
+             (c + math.cos(a0) * r_out, c + math.sin(a0) * r_out),
+             (c + math.cos(a0 + w) * r_in, c + math.sin(a0 + w) * r_in)]
+        d.polygon(p, fill=col)
+    # 内側のリングと太陽の顔（円）
+    R3 = R * 0.34
+    d.ellipse((c - R3, c - R3, c + R3, c + R3), fill=(190, 96, 32, 255))
+    R4 = R * 0.29
+    d.ellipse((c - R4, c - R4, c + R4, c + R4), fill=(250, 200, 70, 255))
+    R5 = R * 0.22
+    d.ellipse((c - R5, c - R5, c + R5, c + R5), fill=(255, 226, 120, 255))
+    # 目と口（にっこりした太陽）
+    ey = c - R5 * 0.15
+    for ex in (c - R5 * 0.38, c + R5 * 0.38):
+        d.ellipse((ex - 14, ey - 18, ex + 14, ey + 18), fill=(120, 60, 30, 255))
+    d.arc((c - R5 * 0.5, c - R5 * 0.2, c + R5 * 0.5, c + R5 * 0.6), 20, 160, fill=(120, 60, 30, 255), width=14)
+    # モザイクの目地（格子）
+    tile = 28
+    grid = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(grid)
+    for v in range(0, n, tile):
+        gd.line((v, 0, v, n), fill=(60, 30, 20, 40), width=2)
+        gd.line((0, v, n, v), fill=(60, 30, 20, 40), width=2)
+    mask = img.getchannel("A")
+    grid.putalpha(Image.fromarray(np.minimum(np.array(grid.getchannel("A")), np.array(mask))))
+    img.alpha_composite(grid)
+    save(apply_noise(img, 5, 3), "tex_sun.png")
 
 
-# ======================================================================
-# 3. 絵画の部屋（奥壁が広く、額を3枚掛けられる）
-# ======================================================================
-def make_room() -> None:
-    img = canvas()
+def make_wall_lower() -> None:
+    """石の腰壁（横に繰り返せる）"""
+    w, h = 512, 256
+    img = Image.new("RGBA", (w, h), WALL_CREAM + (255,))
     d = ImageDraw.Draw(img)
-    poly(d, [(0, 0), (GW, 0), (820, 70), (140, 70)], (250, 240, 222))
+    bw, bh = 128, 64
+    for row in range(h // bh):
+        off = (bw // 2) if row % 2 else 0
+        y0 = row * bh
+        for col in range(-1, w // bw + 1):
+            x0 = col * bw + off
+            shade = random.choice([(236, 224, 194), (240, 230, 204), (230, 216, 184), (244, 234, 210)])
+            d.rectangle((x0 + 3, y0 + 3, x0 + bw - 3, y0 + bh - 3), fill=shade + (255,))
+            d.line((x0 + 3, y0 + 3, x0 + bw - 3, y0 + 3), fill=(250, 244, 226, 255), width=2)  # 上辺ハイライト
+            d.line((x0 + 3, y0 + bh - 3, x0 + bw - 3, y0 + bh - 3), fill=(200, 184, 150, 255), width=3)  # 下辺の影
+    # 目地
+    for row in range(h // bh + 1):
+        d.line((0, row * bh, w, row * bh), fill=WALL_CREAM_DARK + (255,), width=4)
+    save(apply_noise(img, 5, 4), "tex_wall_lower.png")
+
+
+def make_wall_upper() -> None:
+    """壁画: 青空・白い雲・緑の丘（マリオ64のホール上部の壁）。横に繰り返せる"""
+    w, h = 2048, 768
+    img = vgrad(w, h, (96, 160, 236), (186, 222, 250))
+    d = ImageDraw.Draw(img)
+    # 雲（周期的に配置してタイリングを自然に）
+    rnd = random.Random(11)
+    for _ in range(26):
+        cx = rnd.uniform(0, w)
+        cy = rnd.uniform(60, h * 0.62)
+        cw = rnd.uniform(140, 300)
+        for dx in (-w, 0, w):
+            cloud_px(d, cx + dx, cy, cw)
+    # 遠い丘（薄い緑）と近い丘（濃い緑）。端が繋がるように sin の周期を w に合わせる
+    for base, amp, color, k in [(h * 0.80, 70, (132, 200, 118), 3), (h * 0.88, 55, (98, 176, 84), 5), (h * 0.96, 40, (76, 150, 64), 7)]:
+        seq = [(0, h)]
+        for x in range(0, w + 1, 8):
+            y = base - amp * (0.6 + 0.4 * math.sin(2 * math.pi * k * x / w + k)) - amp * 0.3 * math.sin(2 * math.pi * (k + 2) * x / w)
+            seq.append((x, y))
+        seq.append((w, h))
+        d.polygon(seq, fill=color + (255,))
+    # 丘の上に小さな木
+    for i in range(18):
+        x = (i * 113 + 40) % w
+        y = h * 0.86 + 20 * math.sin(i)
+        d.ellipse((x - 14, y - 26, x + 14, y - 2), fill=(56, 120, 48, 255))
+        d.rectangle((x - 3, y - 6, x + 3, y + 6), fill=(104, 68, 40, 255))
+    save(apply_noise(img, 3, 5), "tex_wall_upper.png")
+
+
+def cloud_px(d, cx, cy, w):
+    h = w * 0.42
+    parts = [(0, 0, 0.5, 0.5), (-0.32, 0.12, 0.34, 0.34), (0.3, 0.1, 0.36, 0.36), (-0.1, -0.12, 0.36, 0.36), (0.14, -0.08, 0.3, 0.3)]
+    for ox, oy, rx, ry in parts:
+        d.ellipse((cx + ox * w - rx * w, cy + oy * h + 6 - ry * h, cx + ox * w + rx * w, cy + oy * h + 6 + ry * h), fill=(206, 226, 246, 255))
+    for ox, oy, rx, ry in parts:
+        d.ellipse((cx + ox * w - rx * w, cy + oy * h - ry * h, cx + ox * w + rx * w, cy + oy * h + ry * h), fill=(255, 255, 255, 255))
+
+
+def make_ceiling() -> None:
+    """天井: 生成り地に木の梁の格子"""
+    n = 512
+    img = Image.new("RGBA", (n, n), (246, 236, 214, 255))
+    d = ImageDraw.Draw(img)
+    for v in (0, n // 2):
+        d.rectangle((v - 14, 0, v + 14, n), fill=WOOD + (255,))
+        d.rectangle((0, v - 14, n, v + 14), fill=WOOD + (255,))
+        d.line((v - 14, 0, v - 14, n), fill=WOOD_LIGHT + (255,), width=3)
+        d.line((0, v - 14, n, v - 14), fill=WOOD_LIGHT + (255,), width=3)
+    save(apply_noise(img, 4, 6), "tex_ceiling.png")
+
+
+def door_texture(name: str, w: int, h: int, star: bool, big: bool = False) -> None:
+    """アーチ型の木の両開き扉（透過PNG）。star=True で金の星の紋章"""
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    r = w // 2
+    # 石の枠
+    d.rectangle((0, r, w, h), fill=STONE_SHADE + (255,))
+    d.ellipse((0, 0, w, 2 * r), fill=STONE_SHADE + (255,))
+    m = int(w * 0.07)
+    d.rectangle((m, r, w - m, h), fill=WOOD + (255,))
+    d.ellipse((m, m, w - m, 2 * r - m), fill=WOOD + (255,))
+    # 板の筋
     for i in range(1, 6):
-        t = i / 6
-        line(d, [(140 * t, 70 * t), (GW - 140 * t, 70 * t)], (230, 218, 196), 0.8)
-    cloud_wall_poly(d, [(0, 0), (140, 70), (140, 300), (0, 360)], seed=21)
-    cloud_wall_poly(d, [(GW, 0), (820, 70), (820, 300), (GW, 360)], seed=22)
-    poly(d, [(0, 360), (140, 300), (140, 340), (0, 412)], WALL_CREAM)
-    poly(d, [(GW, 360), (820, 300), (820, 340), (GW, 412)], WALL_CREAM)
-    line(d, [(0, 360), (140, 300)], WALL_CREAM_DARK, 1.6)
-    line(d, [(GW, 360), (820, 300)], WALL_CREAM_DARK, 1.6)
-    # 奥壁：上は雲、腰壁はクリームの石
-    cloud_wall(d, 140, 70, 820, 300, seed=23)
-    rect(d, 140, 300, 820, 340, WALL_CREAM)
-    line(d, [(140, 300), (820, 300)], WALL_CREAM_DARK, 1.6)
-    bricks(d, 140, 302, 820, 340, bw=22, bh=11, color=(226, 212, 182))
-    for x in (142, 818):
-        pillar(d, x, 70, 340, 10)
-    # 壁掛け用のモールディング（額の背後に来る帯）
-    rect(d, 160, 96, 800, 100, (250, 246, 236))
-    # 壁付きの燭台（左右）
-    for x in (200, 760):
-        rect(d, x - 1.5, 200, x + 1.5, 226, GOLD_DARK)
-        poly(d, [(x - 8, 204), (x + 8, 204), (x, 214)], GOLD)
-        ell(d, x, 196, 3.2, 5, (255, 214, 96))
-        ell(d, x, 194, 1.6, 2.6, (255, 250, 220))
-    # 床から見える赤い絨毯（奥壁沿い）
-    out = finish(img)
-    checker_floor(out, 340, cam_h=130, tile=46, focal=300)
-    od = ImageDraw.Draw(out)
-    fx = lambda v: v * FINAL  # noqa: E731
-    od.polygon([(fx(300), fx(340)), (fx(660), fx(340)), (fx(720), fx(GH)), (fx(240), fx(GH))], fill=CARPET)
-    od.line([(fx(300), fx(340)), (fx(240), fx(GH))], fill=CARPET_EDGE, width=3)
-    od.line([(fx(660), fx(340)), (fx(720), fx(GH))], fill=CARPET_EDGE, width=3)
-    od.line([(fx(312), fx(340)), (fx(258), fx(GH))], fill=CARPET_DARK, width=2)
-    od.line([(fx(648), fx(340)), (fx(702), fx(GH))], fill=CARPET_DARK, width=2)
-    sh = Image.new("RGBA", out.size, (0, 0, 0, 0))
-    sd = ImageDraw.Draw(sh)
-    sd.polygon([(0, fx(412)), (fx(140), fx(340)), (fx(820), fx(340)), (fx(GW), fx(412)), (fx(GW), fx(432)), (fx(820), fx(356)), (fx(140), fx(356)), (0, fx(432))], fill=(0, 0, 0, 70))
-    out.alpha_composite(sh.filter(ImageFilter.GaussianBlur(6)))
-    save(out, "room.png")
+        x = m + (w - 2 * m) * i / 6
+        d.line((x, r, x, h), fill=WOOD_DARK + (255,), width=3)
+    d.line((w / 2, m, w / 2, h), fill=WOOD_DARK + (255,), width=6)
+    # 横の帯金
+    for y in (h * 0.55, h * 0.80):
+        d.rectangle((m, y - 8, w - m, y + 8), fill=WOOD_DARK + (255,))
+        for x in range(m + 16, w - m, 28):
+            d.ellipse((x - 4, y - 4, x + 4, y + 4), fill=GOLD_DARK + (255,))
+    # 取っ手
+    for x in (w / 2 - 18, w / 2 + 18):
+        d.ellipse((x - 7, h * 0.62 - 7, x + 7, h * 0.62 + 7), fill=GOLD + (255,))
+    if star:
+        cx, cy = w / 2, r + (0.12 if big else 0.06) * h
+        R = w * (0.26 if big else 0.2)
+        seq = []
+        for i in range(10):
+            a = -math.pi / 2 + i * math.pi / 5
+            rr = R if i % 2 == 0 else R * 0.45
+            seq.append((cx + math.cos(a) * rr, cy + math.sin(a) * rr))
+        d.polygon(seq, fill=GOLD_LIGHT + (255,), outline=GOLD_DARK + (255,), width=4)
+        inner = [(cx + (x - cx) * 0.55, cy + (y - cy) * 0.55) for x, y in seq]
+        d.polygon(inner, fill=(255, 240, 170, 255))
+    save(apply_noise(img, 4, 7), name)
 
 
-# ======================================================================
-# 4. 金の額縁（9スライス）・扉・星・キャンバスのプレースホルダ
-# ======================================================================
-def make_frame() -> None:
-    size = 256
-    b = 40  # 縁の太さ（ゲーム側の9スライス指定と一致させる）
-    img = Image.new("RGBA", (size * 2, size * 2), (0, 0, 0, 0))
+def make_doors() -> None:
+    door_texture("tex_door.png", 256, 512, star=False)
+    door_texture("tex_door_star.png", 256, 512, star=True)
+    door_texture("tex_door_big.png", 384, 640, star=True, big=True)
+
+
+def make_window() -> None:
+    """アーチ窓（透過PNG）: 青いガラスと格子"""
+    w, h = 256, 512
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    k = 2
-    # 外側の影 → 金の縁 → 内側の溝 → 黒の見切り
-    d.rectangle((0, 0, size * k - 1, size * k - 1), fill=GOLD_DARK)
-    d.rectangle((4 * k, 4 * k, size * k - 1 - 4 * k, size * k - 1 - 4 * k), fill=GOLD)
-    d.rectangle((8 * k, 8 * k, size * k - 1 - 8 * k, size * k - 1 - 8 * k), fill=GOLD_LIGHT)
-    d.rectangle((14 * k, 14 * k, size * k - 1 - 14 * k, size * k - 1 - 14 * k), fill=GOLD)
-    d.rectangle((24 * k, 24 * k, size * k - 1 - 24 * k, size * k - 1 - 24 * k), fill=GOLD_DARK)
-    d.rectangle((28 * k, 28 * k, size * k - 1 - 28 * k, size * k - 1 - 28 * k), fill=GOLD_LIGHT)
-    d.rectangle((31 * k, 31 * k, size * k - 1 - 31 * k, size * k - 1 - 31 * k), fill=(60, 44, 20))
-    d.rectangle((b * k, b * k, size * k - 1 - b * k, size * k - 1 - b * k), fill=(0, 0, 0, 0))
-    # 四隅のロゼット（9スライスで伸びない角にだけ置く）
-    for (x, y) in [(18 * k, 18 * k), (size * k - 18 * k, 18 * k), (18 * k, size * k - 18 * k), (size * k - 18 * k, size * k - 18 * k)]:
-        d.ellipse((x - 11 * k, y - 11 * k, x + 11 * k, y + 11 * k), fill=GOLD_DARK)
-        d.ellipse((x - 8 * k, y - 8 * k, x + 8 * k, y + 8 * k), fill=GOLD_LIGHT)
-        for i in range(8):
-            a = i * math.pi / 4
-            px, py = x + math.cos(a) * 5 * k, y + math.sin(a) * 5 * k
-            d.ellipse((px - 2 * k, py - 2 * k, px + 2 * k, py + 2 * k), fill=GOLD)
-        d.ellipse((x - 2.5 * k, y - 2.5 * k, x + 2.5 * k, y + 2.5 * k), fill=GOLD_DARK)
-    img = img.resize((size, size), Image.LANCZOS)
-    # 9スライスの角は上書きされないよう、四隅を再度きれいに
-    save(img, "frame.png")
+    r = w // 2
+    d.rectangle((0, r, w, h), fill=WOOD_DARK + (255,))
+    d.ellipse((0, 0, w, 2 * r), fill=WOOD_DARK + (255,))
+    m = 14
+    d.rectangle((m, r, w - m, h - m), fill=(150, 200, 250, 255))
+    d.ellipse((m, m, w - m, 2 * r - m), fill=(150, 200, 250, 255))
+    # 空の映り込み（上ほど濃い青）
+    for i in range(6):
+        y0 = m + (h - 2 * m) * i / 6
+        c = lerp((110, 170, 240), (190, 224, 252), i / 5)
+        y1 = y0 + (h - 2 * m) / 6
+        if y1 > r:
+            d.rectangle((m, max(y0, r), w - m, y1), fill=c + (255,))
+    d.pieslice((m, m, w - m, 2 * r - m), 180, 360, fill=(110, 170, 240, 255))
+    d.line((w / 2, m, w / 2, h - m), fill=WOOD_DARK + (255,), width=8)
+    for y in (r, h * 0.55, h * 0.75):
+        d.line((m, y, w - m, y), fill=WOOD_DARK + (255,), width=8)
+    save(img, "tex_window.png")
 
 
-def make_placeholder() -> None:
-    """絵が未登録のときのキャンバス（麻布の質感に「？」）"""
-    w, h = 640, 480
-    img = Image.new("RGBA", (w, h), (236, 226, 204, 255))
+def make_carpet() -> None:
+    """赤い絨毯（金の縁取りは3D側で別メッシュ）。細かな織り模様"""
+    n = 256
+    img = Image.new("RGBA", (n, n), CARPET + (255,))
     d = ImageDraw.Draw(img)
-    for y in range(0, h, 4):
-        d.line((0, y, w, y), fill=(226, 214, 190), width=1)
-    for x in range(0, w, 4):
-        d.line((x, 0, x, h), fill=(228, 218, 196), width=1)
-    save(img, "placeholder.png")
-
-
-def make_star() -> None:
-    size = 128
-    img = Image.new("RGBA", (size * 2, size * 2), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    cx = cy = size
-    r = size * 0.9
-    seq = []
-    for i in range(10):
-        a = -math.pi / 2 + i * math.pi / 5
-        rr = r if i % 2 == 0 else r * 0.47
-        seq.append((cx + math.cos(a) * rr, cy + math.sin(a) * rr))
-    d.polygon(seq, fill=GOLD_LIGHT, outline=GOLD_DARK, width=8)
-    inner = [(cx + (x - cx) * 0.55, cy + (y - cy) * 0.55) for x, y in seq]
-    d.polygon(inner, fill=(255, 240, 170))
-    d.ellipse((cx - 22, cy - 6, cx - 10, cy + 14), fill=(40, 30, 20))
-    d.ellipse((cx + 10, cy - 6, cx + 22, cy + 14), fill=(40, 30, 20))
-    save(img.resize((size, size), Image.LANCZOS), "star.png")
+    for y in range(0, n, 16):
+        for x in range(0, n, 16):
+            if (x // 16 + y // 16) % 2 == 0:
+                d.rectangle((x + 6, y + 6, x + 10, y + 10), fill=CARPET_DARK + (255,))
+    save(apply_noise(img, 6, 8), "tex_carpet.png")
 
 
 def make_glass() -> None:
-    """タイトル用の大きなピーチ姫ステンドグラス"""
     img = canvas()
     d = ImageDraw.Draw(img)
     stained_glass_peach(d, 480, 270, 120, 240)
-    bbox = img.getbbox()
-    img = img.crop(bbox)
+    img = img.crop(img.getbbox())
     img = img.resize((img.width // 2, img.height // 2), Image.LANCZOS)
     save(img, "glass_peach.png")
 
 
-def make_particles() -> None:
-    # 星の粒（ワープ時の演出）
-    size = 32
-    img = Image.new("RGBA", (size * 4, size * 4), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    c = size * 2
-    d.polygon([(c, 4), (c + 14, c - 14), (size * 4 - 4, c), (c + 14, c + 14), (c, size * 4 - 4), (c - 14, c + 14), (4, c), (c - 14, c - 14)], fill=(255, 255, 255, 255))
-    save(img.resize((size, size), Image.LANCZOS), "sparkle.png")
-    # ビネット
-    w, h = 960, 540
-    v = Image.new("L", (w, h), 0)
-    vd = ImageDraw.Draw(v)
-    vd.ellipse((-w * 0.2, -h * 0.35, w * 1.2, h * 1.35), fill=255)
-    v = v.filter(ImageFilter.GaussianBlur(90))
-    out = Image.new("RGBA", (w, h), (30, 20, 30, 255))
-    out.putalpha(Image.eval(v, lambda p: 255 - p))
-    save(out, "vignette.png")
-
-
 if __name__ == "__main__":
     make_outside()
-    make_foyer()
-    make_room()
-    make_frame()
-    make_placeholder()
-    make_star()
+    make_floor_tile()
+    make_sun_rug()
+    make_wall_lower()
+    make_wall_upper()
+    make_ceiling()
+    make_doors()
+    make_window()
+    make_carpet()
     make_glass()
-    make_particles()

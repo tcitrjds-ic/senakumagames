@@ -1,10 +1,8 @@
-import Phaser from 'phaser';
-
 /**
  * WebAudio で SE と BGM をその場で合成する小さなサウンドボックス。
  * 笑い声などのユーザー提供ファイルは HTMLAudio で再生する。
  */
-export type SfxName = 'click' | 'door' | 'warp' | 'chime' | 'pop' | 'back';
+export type SfxName = 'click' | 'door' | 'warp' | 'chime' | 'pop' | 'back' | 'jump' | 'step';
 
 const MUTE_KEY = 'senakuma:muted';
 
@@ -32,6 +30,11 @@ class AudioBoxImpl {
     }
   }
 
+  /** ユーザー操作の直後に呼んで AudioContext を起こす */
+  unlock(): void {
+    this.ac();
+  }
+
   private tone(f0: number, dur: number, type: OscillatorType, vol: number, at = 0, f1?: number): void {
     const ctx = this.ac();
     if (!ctx || this.muted) return;
@@ -53,13 +56,13 @@ class AudioBoxImpl {
     switch (name) {
       case 'click': this.tone(620, 0.06, 'triangle', 0.08); break;
       case 'back': this.tone(520, 0.07, 'triangle', 0.07); this.tone(390, 0.1, 'triangle', 0.06, 0.06); break;
+      case 'jump': this.tone(300, 0.18, 'square', 0.04, 0, 700); break;
+      case 'step': this.tone(140 + Math.random() * 40, 0.05, 'triangle', 0.03); break;
       case 'door':
-        // きしむ木の扉 → カチャ
         this.tone(180, 0.35, 'sawtooth', 0.03, 0, 240);
         this.tone(900, 0.05, 'square', 0.04, 0.32);
         break;
       case 'warp':
-        // 絵に吸い込まれる「ひゅ〜ん」＋きらめき
         this.tone(220, 0.7, 'sine', 0.09, 0, 1400);
         this.tone(330, 0.7, 'triangle', 0.05, 0.05, 1900);
         [1568, 1976, 2349, 2794].forEach((f, i) => this.tone(f, 0.18, 'triangle', 0.035, 0.45 + i * 0.07));
@@ -85,9 +88,7 @@ class AudioBoxImpl {
       a.addEventListener('error', () => this.clipCache.set(path, null));
       this.clipCache.set(path, a);
     }
-    if (this.current && this.current !== a) {
-      this.current.pause();
-    }
+    if (this.current && this.current !== a) this.current.pause();
     this.current = a;
     a.currentTime = 0;
     void a.play().catch(() => {
@@ -149,19 +150,3 @@ class AudioBoxImpl {
 }
 
 export const AudioBox = new AudioBoxImpl();
-
-/** 右上のミュート切替ボタン */
-export function addMuteButton(scene: Phaser.Scene, x: number, y: number): void {
-  const bg = scene.add.circle(x, y, 24, 0xfff8e8, 0.92).setDepth(60).setStrokeStyle(3, 0xd8b45a);
-  const icon = scene.add
-    .text(x, y, AudioBox.muted ? '🔇' : '🔊', { fontSize: '22px' })
-    .setOrigin(0.5)
-    .setDepth(61);
-  bg.setInteractive({ useHandCursor: true });
-  bg.on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
-    event.stopPropagation();
-    const muted = AudioBox.toggleMute();
-    icon.setText(muted ? '🔇' : '🔊');
-    AudioBox.play('click');
-  });
-}
