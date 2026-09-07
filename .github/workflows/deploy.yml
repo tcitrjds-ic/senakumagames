@@ -28,12 +28,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - name: サイトを組み立て（/ = ポータル, /runner/, /mancala/）
+      - name: サイトを組み立て（/ = ポータル, /runner/, /mancala/, /gallery/）
         run: |
-          mkdir -p site/runner site/mancala
+          mkdir -p site/runner site/mancala site/gallery
           cp -r portal/* site/
           cp -r games/runner-2d/dist/* site/runner/
           cp -r games/mancala/dist/* site/mancala/
+          cp -r games/gallery/dist/* site/gallery/
       - uses: actions/configure-pages@v5
         with:
           enablement: true # 初回実行時にGitHub Pagesを自動で有効化する

@@ -10,8 +10,9 @@ YouTuber「せなくま」さん（[せなくまチャンネル](https://www.you
 
 1. **せなくまラン 🍟** — 2D横スクロールランナー（Phaser 3）… **プレイ可能** ✅
 2. **せなくまとマンカラ 🥔** — せなくまと対戦するマンカラ（カラハ・ルール）… **プレイ可能** ✅
-3. **せなくまアイランド 🏝️** — 3D箱庭探索ゲーム（Three.js + VRM）… 未着手
-4. **Webポータル** — 各ゲームの入口となるページ（GitHub Pagesで公開予定）… 未着手
+3. **せなくま美術館 🏰** — ピーチ城風の城内に絵を飾る鑑賞ゲーム（Phaser 3）… **枠は完成・絵の投入待ち** 🖼️
+4. **せなくまアイランド 🏝️** — 3D箱庭探索ゲーム（Three.js + VRM）… 未着手
+5. **Webポータル** — 各ゲームの入口となるページ（GitHub Pagesで公開予定）… 未着手
 
 ## 開発の始め方
 
@@ -19,14 +20,15 @@ YouTuber「せなくま」さん（[せなくまチャンネル](https://www.you
 npm install
 npm run dev            # せなくまラン の開発サーバー
 npm run dev:mancala    # せなくまとマンカラ の開発サーバー
-npm run build          # 両ゲームの本番ビルド（games/*/dist/）
+npm run dev:gallery    # せなくま美術館 の開発サーバー
+npm run build          # 全ゲームの本番ビルド（games/*/dist/）
 ```
 
 ## 公開（GitHub Pages）
 
 `.github/workflows/deploy.yml` が、ポータル（`portal/`）と両ゲームを
 まとめてGitHub Pagesへデプロイします。サイト構成は
-`/`（ポータル）→ `/runner/`・`/mancala/`（各ゲーム）。
+`/`（ポータル）→ `/runner/`・`/mancala/`・`/gallery/`（各ゲーム）。
 
 初回のみ設定が必要です:
 
@@ -36,6 +38,16 @@ npm run build          # 両ゲームの本番ビルド（games/*/dist/）
      このブランチを選んで手動実行もできます
 
 公開URL: `https://<ユーザー名>.github.io/senakumagames/`
+
+## せなくま美術館に絵を飾る
+
+`games/gallery/public/assets/paintings/` にスクリーンショット（絵）と笑い声の音声を置き、
+同じ場所の `manifest.json` にファイル名と題名を書くだけで額に飾られます（コード変更不要）。
+書き方は [games/gallery/public/assets/paintings/README.md](./games/gallery/public/assets/paintings/README.md) を参照。
+
+- 額をタップ → 波紋が広がって拡大 → もう一度タップで題名 → もう一度で笑い声 → もう一度で閉じる
+- 1部屋3枚、1階に4部屋。5部屋目からは大きな星の扉の先（2F）に自動で続きます
+- 城の背景（外観・ホール・部屋・額縁）は `tools/make_gallery_assets.py` で生成しています
 
 ## キャラクター画像
 

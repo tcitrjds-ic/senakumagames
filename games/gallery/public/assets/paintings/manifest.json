@@ -1,0 +1,36 @@
+{
+  "rooms": [
+    {
+      "name": "1F ひだりのへや",
+      "paintings": [
+        { "image": "", "title": "", "laugh": "" },
+        { "image": "", "title": "", "laugh": "" },
+        { "image": "", "title": "", "laugh": "" }
+      ]
+    },
+    {
+      "name": "1F みぎのへや",
+      "paintings": [
+        { "image": "", "title": "", "laugh": "" },
+        { "image": "", "title": "", "laugh": "" },
+        { "image": "", "title": "", "laugh": "" }
+      ]
+    },
+    {
+      "name": "2F ひだりのへや",
+      "paintings": [
+        { "image": "", "title": "", "laugh": "" },
+        { "image": "", "title": "", "laugh": "" },
+        { "image": "", "title": "", "laugh": "" }
+      ]
+    },
+    {
+      "name": "2F みぎのへや",
+      "paintings": [
+        { "image": "", "title": "", "laugh": "" },
+        { "image": "", "title": "", "laugh": "" },
+        { "image": "", "title": "", "laugh": "" }
+      ]
+    }
+  ]
+}
