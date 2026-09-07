@@ -39,6 +39,9 @@ async function main(): Promise<void> {
   // ---- 読み込み（テクスチャ・マニフェスト・絵）----
   const enter = $<HTMLButtonElement>('enter');
   const manager = new THREE.LoadingManager();
+  // 単一HTMLに固めた配布物（アーティファクト等）では、素材URLを data URI に差し替える
+  const assetMap = (window as unknown as { __ASSET_MAP?: Record<string, string> }).__ASSET_MAP;
+  if (assetMap) manager.setURLModifier((u) => assetMap[u] ?? u);
   manager.onProgress = (_u, loaded, total) => {
     enter.textContent = `よみこみちゅう… ${Math.round((loaded / Math.max(1, total)) * 100)}%`;
   };
