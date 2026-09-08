@@ -8,6 +8,7 @@ import { Controls } from './controls';
 import { normalizeManifest, type Painting, type RawManifest } from './manifest';
 import { HungPainting, placeholderTexture } from './painting';
 import { Player } from './player';
+import { Npc, type NpcSpec } from './npc';
 import { loadTexture, loadTextures } from './textures';
 import { Viewer } from './viewer';
 
@@ -83,7 +84,21 @@ async function main(): Promise<void> {
     hung.push(hp);
   });
 
-  const player = new Player(scene, tex.playerIdle, tex.playerWalk, castle.blockers, castle.heightAt);
+  const player = new Player(scene, tex.charSenakuma, castle.blockers, castle.heightAt);
+
+  // ---- 城の住人（歩き回る）----
+  const stairsBox = { x: [-3.8, 3.8] as [number, number], z: [-14, -1.2] as [number, number] };
+  const alcoves = [
+    { x: [-14, -7.5] as [number, number], z: [9, 16] as [number, number] },
+    { x: [7.5, 14] as [number, number], z: [9, 16] as [number, number] },
+  ];
+  const specs: { spec: NpcSpec; sheet: THREE.Texture }[] = [
+    { sheet: tex.charToad, spec: { name: 'キノピオ', cellHeight: 1.45, speed: 1.6, zones: [{ x: [-7, 7], z: [7, 14.5] }], avoid: alcoves, start: [-4, 9.5] } },
+    { sheet: tex.charMario, spec: { name: 'マリオ', cellHeight: 1.75, speed: 2.1, zones: [{ x: [-12, 12], z: [-7.5, 8] }], avoid: [stairsBox, ...alcoves], start: [6, 2] } },
+    { sheet: tex.charLuigi, spec: { name: 'ルイージ', cellHeight: 1.9, speed: 1.9, zones: [{ x: [-12, 12], z: [-7.5, 8] }], avoid: [stairsBox, ...alcoves], start: [-7, 0] } },
+    { sheet: tex.charPeach, spec: { name: 'ピーチ', cellHeight: 1.9, speed: 1.3, zones: [{ x: [-12, 12], z: [-13.2, -9.9] }], avoid: [{ x: [-2.2, 2.2], z: [-14, -9] }], start: [4, -11.5] } },
+  ];
+  const npcs = specs.map(({ spec, sheet }) => new Npc(scene, sheet, spec, castle.blockers, castle.heightAt));
   const controls = new Controls($('joy'), $('joy-base'), $('joy-knob'), $('orbit'), $('btn-jump'), $('btn-look'));
   const clock = new THREE.Clock();
   let elapsed = 0;
@@ -215,6 +230,7 @@ async function main(): Promise<void> {
   const fwd = new THREE.Vector3();
   const rightV = new THREE.Vector3();
   const move = new THREE.Vector3();
+  const camFwd = new THREE.Vector3(0, 0, -1);
   let nearest: HungPainting | null = null;
   const loop = () => {
     const dt = Math.min(0.1, clock.getDelta());
@@ -229,7 +245,7 @@ async function main(): Promise<void> {
       rightV.set(Math.cos(camYaw), 0, -Math.sin(camYaw));
       move.set(0, 0, 0).addScaledVector(fwd, input.stickY).addScaledVector(rightV, input.stickX);
       const moving = move.lengthSq() > 0.0025;
-      player.update(dt, { mx: move.x, mz: move.z, jump: input.jumpPressed }, camYaw);
+      player.update(dt, { mx: move.x, mz: move.z, jump: input.jumpPressed });
       updateCamera(dt, moving ? move : null, input.sinceOrbit);
 
       // 近くの絵を探す
@@ -266,6 +282,10 @@ async function main(): Promise<void> {
         updateCamera(dt, null, 999);
       }
     }
+    for (const n of npcs) n.update(dt, player.pos);
+    camFwd.set(camTarget.x - camera.position.x, 0, camTarget.z - camera.position.z).normalize();
+    player.render(camFwd);
+    for (const n of npcs) n.render(camFwd);
     renderer.render(scene, camera);
     requestAnimationFrame(loop);
   };

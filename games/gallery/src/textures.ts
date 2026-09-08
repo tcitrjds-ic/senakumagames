@@ -12,8 +12,11 @@ export interface Tex {
   window: THREE.Texture;
   carpet: THREE.Texture;
   glass: THREE.Texture;
-  playerIdle: THREE.Texture;
-  playerWalk: THREE.Texture;
+  charSenakuma: THREE.Texture;
+  charToad: THREE.Texture;
+  charMario: THREE.Texture;
+  charLuigi: THREE.Texture;
+  charPeach: THREE.Texture;
 }
 
 const FILES: Record<keyof Tex, string> = {
@@ -28,11 +31,14 @@ const FILES: Record<keyof Tex, string> = {
   window: 'tex_window.png',
   carpet: 'tex_carpet.png',
   glass: 'glass_peach.png',
-  playerIdle: 'senakuma_idle.png',
-  playerWalk: 'senakuma_walk.png',
+  charSenakuma: 'char_senakuma.png',
+  charToad: 'char_toad.png',
+  charMario: 'char_mario.png',
+  charLuigi: 'char_luigi.png',
+  charPeach: 'char_peach.png',
 };
 const TILED: (keyof Tex)[] = ['floor', 'wallLower', 'wallUpper', 'ceiling', 'carpet'];
-const PIXEL: (keyof Tex)[] = ['playerIdle', 'playerWalk'];
+const PIXEL: (keyof Tex)[] = ['charSenakuma', 'charToad', 'charMario', 'charLuigi', 'charPeach'];
 
 export function loadTexture(loader: THREE.TextureLoader, url: string): Promise<THREE.Texture> {
   return new Promise((resolve, reject) => {
@@ -58,7 +64,8 @@ export async function loadTextures(manager: THREE.LoadingManager, anisotropy: nu
       if (TILED.includes(k)) t.wrapS = t.wrapT = THREE.RepeatWrapping;
       if (PIXEL.includes(k)) {
         t.magFilter = THREE.NearestFilter;
-        t.minFilter = THREE.NearestMipmapLinearFilter;
+        t.minFilter = THREE.NearestFilter;
+        t.generateMipmaps = false;
       }
       out[k] = t;
     }),
