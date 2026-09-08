@@ -7,8 +7,6 @@ import * as THREE from 'three';
  */
 export type View = 'front' | 'back' | 'side';
 const ROW: Record<View, number> = { front: 0, back: 1, side: 2 };
-const CELL_W = 24;
-const CELL_H = 32;
 
 export class PixelSprite {
   readonly sprite: THREE.Sprite;
@@ -18,14 +16,14 @@ export class PixelSprite {
   private frame = 0;
   private flip = false;
 
-  constructor(sheet: THREE.Texture, cellHeight: number) {
+  constructor(sheet: THREE.Texture, cellHeight: number, cellW = 24, cellH = 32) {
     this.tex = sheet.clone();
     this.tex.needsUpdate = true;
     this.tex.repeat.set(1 / 3, 1 / 3);
     this.tex.offset.set(0, 2 / 3);
     const mat = new THREE.SpriteMaterial({ map: this.tex, transparent: true, alphaTest: 0.3 });
     this.sprite = new THREE.Sprite(mat);
-    this.w = (cellHeight * CELL_W) / CELL_H;
+    this.w = (cellHeight * cellW) / cellH;
     this.sprite.scale.set(this.w, cellHeight, 1);
     this.sprite.center.set(0.5, 0);
   }

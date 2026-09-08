@@ -18,7 +18,7 @@ export class Player extends Walker {
   private stepT = 0;
 
   constructor(scene: THREE.Scene, sheet: THREE.Texture, blockers: Blocker[], heightAt: (x: number, z: number) => number) {
-    super(scene, sheet, 1.75, blockers, heightAt);
+    super(scene, sheet, 1.8, blockers, heightAt, 0.42, [32, 44]);
     this.place(0, 12.5);
   }
 

@@ -24,9 +24,10 @@ export class Walker {
     protected readonly blockers: Blocker[],
     protected readonly heightAt: (x: number, z: number) => number,
     radius = 0.42,
+    cell: [number, number] = [24, 32],
   ) {
     this.radius = radius;
-    this.pixel = new PixelSprite(sheet, cellHeight);
+    this.pixel = new PixelSprite(sheet, cellHeight, cell[0], cell[1]);
     scene.add(this.pixel.sprite);
     this.shadow = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), new THREE.MeshBasicMaterial({ map: shadowTexture(), transparent: true, depthWrite: false }));
     this.shadow.rotation.x = -Math.PI / 2;
