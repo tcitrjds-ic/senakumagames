@@ -16,14 +16,17 @@ export class PixelSprite {
   private frame = 0;
   private flip = false;
 
-  constructor(sheet: THREE.Texture, cellHeight: number, cellW = 24, cellH = 32) {
+  constructor(sheet: THREE.Texture, cellHeight: number) {
     this.tex = sheet.clone();
     this.tex.needsUpdate = true;
     this.tex.repeat.set(1 / 3, 1 / 3);
     this.tex.offset.set(0, 2 / 3);
     const mat = new THREE.SpriteMaterial({ map: this.tex, transparent: true, alphaTest: 0.3 });
     this.sprite = new THREE.Sprite(mat);
-    this.w = (cellHeight * cellW) / cellH;
+    // 3×3 のシートなので、シート全体の縦横比＝1コマの縦横比
+    const img = sheet.image as { width?: number; height?: number } | undefined;
+    const aspect = img && img.width && img.height ? img.width / img.height : 0.75;
+    this.w = cellHeight * aspect;
     this.sprite.scale.set(this.w, cellHeight, 1);
     this.sprite.center.set(0.5, 0);
   }

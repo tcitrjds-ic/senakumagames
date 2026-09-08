@@ -121,6 +121,11 @@ class AudioBoxImpl {
     this.musicTimer = window.setInterval(() => {
       const c = this.ac();
       if (!c) return;
+      // タブが裏に回って setInterval が止まっていた間の拍は、まとめて鳴らさず飛ばす
+      if (next < c.currentTime) {
+        this.beat += Math.ceil((c.currentTime - next) / step);
+        next = c.currentTime + 0.05;
+      }
       while (next < c.currentTime + 0.35) {
         const at = Math.max(0, next - c.currentTime);
         const i = this.beat % 64;

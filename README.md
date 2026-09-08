@@ -26,7 +26,7 @@ npm run build          # 全ゲームの本番ビルド（games/*/dist/）
 
 ## 公開（GitHub Pages）
 
-`.github/workflows/deploy.yml` が、ポータル（`portal/`）と両ゲームを
+`.github/workflows/deploy.yml` が、ポータル（`portal/`）と各ゲームを
 まとめてGitHub Pagesへデプロイします。サイト構成は
 `/`（ポータル）→ `/runner/`・`/mancala/`・`/gallery/`（各ゲーム）。
 

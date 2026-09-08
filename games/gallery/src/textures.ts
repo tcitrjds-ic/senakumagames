@@ -20,16 +20,16 @@ export interface Tex {
 }
 
 const FILES: Record<keyof Tex, string> = {
-  floor: 'tex_floor.png',
+  floor: 'tex_floor.jpg',
   sun: 'tex_sun.png',
-  wallLower: 'tex_wall_lower.png',
-  wallUpper: 'tex_wall_upper.png',
-  ceiling: 'tex_ceiling.png',
+  wallLower: 'tex_wall_lower.jpg',
+  wallUpper: 'tex_wall_upper.jpg',
+  ceiling: 'tex_ceiling.jpg',
   door: 'tex_door.png',
   doorStar: 'tex_door_star.png',
   doorBig: 'tex_door_big.png',
   window: 'tex_window.png',
-  carpet: 'tex_carpet.png',
+  carpet: 'tex_carpet.jpg',
   glass: 'glass_peach.png',
   charSenakuma: 'char_senakuma.png',
   charToad: 'char_toad.png',

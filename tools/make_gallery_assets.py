@@ -8,6 +8,9 @@
      石の腰壁、「青空・雲・緑の丘」の壁画、天井、木の扉（星の扉）、アーチ窓、絨毯
 を Pillow で描く。
 
+不透明なテクスチャ（床・腰壁・壁画・天井・絨毯）はJPEG(q85)、透過が要るもの
+（太陽の絨毯・扉・窓・ステンドグラス）と外観画像はPNGで保存する。
+
 使い方:
     pip install Pillow numpy
     python tools/make_gallery_assets.py
@@ -62,10 +65,19 @@ GOLD_LIGHT = (252, 226, 130)
 
 
 def save(img: Image.Image, name: str) -> None:
+    """透過が必要な画像用: PNGで保存（optimize でサイズを詰める）"""
     OUT.mkdir(parents=True, exist_ok=True)
     p = OUT / name
-    img.save(p)
-    print(f"wrote {p} ({img.width}x{img.height})")
+    img.save(p, optimize=True)
+    print(f"wrote {p} ({img.width}x{img.height}, {p.stat().st_size // 1024} KB)")
+
+
+def save_opaque(img: Image.Image, name: str, quality: int = 85) -> None:
+    """不透明なテクスチャ用: RGBA→RGB に落としてJPEGで保存（PNGの1/10前後になる）"""
+    OUT.mkdir(parents=True, exist_ok=True)
+    p = OUT / name
+    img.convert("RGB").save(p, quality=quality, optimize=True, subsampling=0)
+    print(f"wrote {p} ({img.width}x{img.height}, {p.stat().st_size // 1024} KB)")
 
 
 def lerp(a, b, t):
@@ -335,13 +347,15 @@ def make_outside() -> None:
 # ======================================================================
 # 2. 3D ホール用テクスチャ
 # ======================================================================
-def noise_img(w, h, amount=6, seed=1) -> Image.Image:
+def noise_img(w, h, amount=3, seed=1, block=2):
+    """block×block のブロック単位でノイズを作る（1px単位より圧縮が効く）"""
     rnd = np.random.default_rng(seed)
-    n = rnd.integers(-amount, amount + 1, size=(h, w, 1))
-    return n
+    n = rnd.integers(-amount, amount + 1, size=(-(-h // block), -(-w // block), 1))
+    return np.repeat(np.repeat(n, block, axis=0), block, axis=1)[:h, :w]
 
 
-def apply_noise(img: Image.Image, amount=6, seed=1) -> Image.Image:
+def apply_noise(img: Image.Image, amount=3, seed=1, block=2) -> Image.Image:
+    """質感用の粒子ノイズ。振幅は小さめに（大きいとPNG/JPEGが一気に重くなる）"""
     arr = np.array(img.convert("RGBA")).astype(np.int16)
     arr[..., :3] = np.clip(arr[..., :3] + noise_img(img.width, img.height, amount, seed), 0, 255)
     return Image.fromarray(arr.astype(np.uint8), "RGBA")
@@ -365,7 +379,7 @@ def make_floor_tile() -> None:
         x0, y0 = random.uniform(0, n), random.uniform(0, n)
         x1, y1 = x0 + random.uniform(-50, 50), y0 + random.uniform(-50, 50)
         d.line((x0, y0, x1, y1), fill=(255, 255, 255, 18), width=2)
-    save(apply_noise(img, 3, 2), "tex_floor.png")
+    save_opaque(apply_noise(img, 2, 2), "tex_floor.jpg")
 
 
 def make_sun_rug() -> None:
@@ -412,7 +426,7 @@ def make_sun_rug() -> None:
     mask = img.getchannel("A")
     grid.putalpha(Image.fromarray(np.minimum(np.array(grid.getchannel("A")), np.array(mask))))
     img.alpha_composite(grid)
-    save(apply_noise(img, 5, 3), "tex_sun.png")
+    save(apply_noise(img, 2, 3), "tex_sun.png")
 
 
 def make_wall_lower() -> None:
@@ -433,7 +447,7 @@ def make_wall_lower() -> None:
     # 目地
     for row in range(h // bh + 1):
         d.line((0, row * bh, w, row * bh), fill=WALL_CREAM_DARK + (255,), width=4)
-    save(apply_noise(img, 5, 4), "tex_wall_lower.png")
+    save_opaque(apply_noise(img, 3, 4), "tex_wall_lower.jpg")
 
 
 def make_wall_upper() -> None:
@@ -463,7 +477,7 @@ def make_wall_upper() -> None:
         y = h * 0.86 + 20 * math.sin(i)
         d.ellipse((x - 14, y - 26, x + 14, y - 2), fill=(56, 120, 48, 255))
         d.rectangle((x - 3, y - 6, x + 3, y + 6), fill=(104, 68, 40, 255))
-    save(apply_noise(img, 3, 5), "tex_wall_upper.png")
+    save_opaque(apply_noise(img, 2, 5), "tex_wall_upper.jpg")
 
 
 def cloud_px(d, cx, cy, w):
@@ -485,7 +499,7 @@ def make_ceiling() -> None:
         d.rectangle((0, v - 14, n, v + 14), fill=WOOD + (255,))
         d.line((v - 14, 0, v - 14, n), fill=WOOD_LIGHT + (255,), width=3)
         d.line((0, v - 14, n, v - 14), fill=WOOD_LIGHT + (255,), width=3)
-    save(apply_noise(img, 4, 6), "tex_ceiling.png")
+    save_opaque(apply_noise(img, 3, 6), "tex_ceiling.jpg")
 
 
 def door_texture(name: str, w: int, h: int, star: bool, big: bool = False) -> None:
@@ -523,7 +537,7 @@ def door_texture(name: str, w: int, h: int, star: bool, big: bool = False) -> No
         d.polygon(seq, fill=GOLD_LIGHT + (255,), outline=GOLD_DARK + (255,), width=4)
         inner = [(cx + (x - cx) * 0.55, cy + (y - cy) * 0.55) for x, y in seq]
         d.polygon(inner, fill=(255, 240, 170, 255))
-    save(apply_noise(img, 4, 7), name)
+    save(apply_noise(img, 3, 7), name)
 
 
 def make_doors() -> None:
@@ -566,7 +580,7 @@ def make_carpet() -> None:
         for x in range(0, n, 16):
             if (x // 16 + y // 16) % 2 == 0:
                 d.rectangle((x + 6, y + 6, x + 10, y + 10), fill=CARPET_DARK + (255,))
-    save(apply_noise(img, 6, 8), "tex_carpet.png")
+    save_opaque(apply_noise(img, 3, 8), "tex_carpet.jpg")
 
 
 def make_glass() -> None:

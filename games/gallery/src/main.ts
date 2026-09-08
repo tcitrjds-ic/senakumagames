@@ -15,8 +15,9 @@ import { Viewer } from './viewer';
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
 async function main(): Promise<void> {
-  // フォント（キャンバスに描く番号プレート等のため）
-  await Promise.race([
+  // フォント（キャンバスに描く番号プレート等のため）。読み込みは先に始めて、
+  // 文字を描くところ（額の番号プレート・空きキャンバス）の直前まで待たない。
+  const fontsReady = Promise.race([
     Promise.all([document.fonts.load('800 32px "M PLUS Rounded 1c"'), document.fonts.load('700 32px "M PLUS Rounded 1c"')]),
     new Promise((r) => setTimeout(r, 2500)),
   ]);
@@ -42,22 +43,27 @@ async function main(): Promise<void> {
   const manager = new THREE.LoadingManager();
   // 単一HTMLに固めた配布物（アーティファクト等）では、素材URLを data URI に差し替える
   const assetMap = (window as unknown as { __ASSET_MAP?: Record<string, string> }).__ASSET_MAP;
-  if (assetMap) manager.setURLModifier((u) => assetMap[u] ?? u);
+  const resolveAsset = (u: string): string => assetMap?.[u] ?? u;
+  if (assetMap) manager.setURLModifier(resolveAsset);
   manager.onProgress = (_u, loaded, total) => {
     enter.textContent = `よみこみちゅう… ${Math.round((loaded / Math.max(1, total)) * 100)}%`;
   };
   const aniso = renderer.capabilities.getMaxAnisotropy();
   const [tex, raw] = await Promise.all([
     loadTextures(manager, aniso),
-    fetch('assets/paintings/manifest.json')
+    fetch(resolveAsset('assets/paintings/manifest.json'))
       .then((r) => (r.ok ? (r.json() as Promise<RawManifest>) : undefined))
       .catch(() => undefined),
   ]);
   const paintings: Painting[] = normalizeManifest(raw);
+
+  // ---- 城と絵 ----
+  const castle = buildCastle(scene, tex);
   const loader = new THREE.TextureLoader(manager);
+  // 額を掛ける場所の数より後ろの絵は表示しないので読み込まない
   const images = await Promise.all(
-    paintings.map(async (p) => {
-      if (!p.image) return null;
+    paintings.map(async (p, i) => {
+      if (!p.image || i >= castle.slots.length) return null;
       try {
         const t = await loadTexture(loader, `assets/paintings/${p.image}`);
         t.anisotropy = aniso;
@@ -69,8 +75,8 @@ async function main(): Promise<void> {
     }),
   );
 
-  // ---- 城と絵 ----
-  const castle = buildCastle(scene, tex);
+  // 文字を描くキャンバス（番号プレート・空きキャンバス）を作る前にフォントを待つ
+  await fontsReady;
   const hung: HungPainting[] = [];
   paintings.forEach((p, i) => {
     const slot = castle.slots[i];
@@ -99,10 +105,13 @@ async function main(): Promise<void> {
     { sheet: tex.charPeach, spec: { name: 'ピーチ', cellHeight: 1.9, speed: 1.3, zones: [{ x: [-12, 12], z: [-13.2, -9.9] }], avoid: [{ x: [-2.2, 2.2], z: [-14, -9] }], start: [4, -11.5] } },
   ];
   const npcs = specs.map(({ spec, sheet }) => new Npc(scene, sheet, spec, castle.blockers, castle.heightAt));
-  const controls = new Controls($('joy'), $('joy-base'), $('joy-knob'), $('orbit'), $('btn-jump'), $('btn-look'));
+  // 絵の拡大表示中は、Enter / Space / F などの入力をビューアに任せる
+  const controls = new Controls($('joy'), $('joy-base'), $('joy-knob'), $('orbit'), $('btn-jump'), $('btn-look'), {
+    isBlocked: () => viewer.blocksInput,
+  });
   const clock = new THREE.Clock();
   let elapsed = 0;
-  const viewer = new Viewer(camera, () => elapsed);
+  const viewer = new Viewer(camera, () => elapsed, resolveAsset);
 
   // ---- HUD ----
   const toastEl = $('toast');
@@ -223,7 +232,7 @@ async function main(): Promise<void> {
   });
 
   // デバッグ用（E2Eテストが位置やフレームレートを読む）
-  const dbg = { frames: 0, pos: player.pos, camYaw: () => camYaw, started: () => started };
+  const dbg = { frames: 0, pos: player.pos, camYaw: () => camYaw, started: () => started, grounded: () => (player as unknown as { grounded: boolean }).grounded };
   (window as unknown as { __gallery: typeof dbg }).__gallery = dbg;
 
   // ---- メインループ ----

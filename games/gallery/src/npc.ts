@@ -34,7 +34,7 @@ export class Npc extends Walker {
     sheet: THREE.Texture,
     readonly spec: NpcSpec,
     blockers: Blocker[],
-    heightAt: (x: number, z: number) => number,
+    heightAt: (x: number, z: number, fromY?: number) => number,
   ) {
     super(scene, sheet, spec.cellHeight, blockers, heightAt, 0.38);
     this.place(spec.start[0], spec.start[1]);
@@ -52,7 +52,7 @@ export class Npc extends Walker {
       const z = THREE.MathUtils.lerp(zn.z[0], zn.z[1], Math.random());
       if (this.inZone(x, z, this.spec.avoid)) continue;
       // 目的地が今いる高さと違う場所（階段の先など）は選ばない
-      if (Math.abs(this.heightAt(x, z) - this.pos.y) > 0.3) continue;
+      if (Math.abs(this.heightAt(x, z, this.pos.y) - this.pos.y) > 0.3) continue;
       this.target.set(x, z);
       return;
     }

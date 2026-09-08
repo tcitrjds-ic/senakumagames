@@ -49,8 +49,16 @@ export interface Blocker {
 export interface Castle {
   slots: Slot[];
   blockers: Blocker[];
-  heightAt: (x: number, z: number) => number;
+  /**
+   * (x, z) で立てる一番高い床の高さ。
+   * fromY はいまの足元の高さで、そこから STEP_UP まで登れる床だけを見る
+   * （中2階の下をくぐれるようにするため）。
+   */
+  heightAt: (x: number, z: number, fromY?: number) => number;
 }
+
+/** これ以上の段差は登れない（壁扱い） */
+export const STEP_UP = 0.65;
 
 const CREAM = 0xf3e9d2;
 const CREAM_DARK = 0xd9c9a6;
@@ -313,12 +321,13 @@ export function buildCastle(scene: THREE.Scene, tex: Tex): Castle {
   slot(-5.8, R.mez + 2.9, bz, 0, 1, 2.8, 2.1);
   slot(5.8, R.mez + 2.9, bz, 0, 1, 2.8, 2.1);
   slot(9.8, R.mez + 2.9, bz, 0, 1, 2.8, 2.1);
-  slot(lx, 2.6, 6.5, 1, 0, 2.6, 2.0); // 左の壁（1階）
-  slot(lx, 2.6, 1.5, 1, 0, 2.6, 2.0);
-  slot(rx, 2.6, 6.5, -1, 0, 2.6, 2.0); // 右の壁（1階）
-  slot(rx, 2.6, 1.5, -1, 0, 2.6, 2.0);
-  slot(-6.5, 2.7, fz, 0, -1, 2.6, 2.0); // 入口側の壁（1階）
-  slot(6.5, 2.7, fz, 0, -1, 2.6, 2.0);
+  // 1階の壁の額は、腰壁の上の見切り縁（y 3.20〜3.46）に額の上辺がかからない高さに置く
+  slot(lx, 1.95, 6.5, 1, 0, 2.6, 1.85); // 左の壁（1階）
+  slot(lx, 1.95, 1.5, 1, 0, 2.6, 1.85);
+  slot(rx, 1.95, 6.5, -1, 0, 2.6, 1.85); // 右の壁（1階）
+  slot(rx, 1.95, 1.5, -1, 0, 2.6, 1.85);
+  slot(-6.5, 1.95, fz, 0, -1, 2.6, 1.85); // 入口側の壁（1階）
+  slot(6.5, 1.95, fz, 0, -1, 2.6, 1.85);
   slot(-8.4, 8.2, fz, 0, -1, 2.6, 2.0); // 入口側の壁（上部）
   slot(8.4, 8.2, fz, 0, -1, 2.6, 2.0);
   slot(-11.6, 1.75, bz, 0, 1, 2.0, 1.45); // 中2階の下（奥の壁）
@@ -327,12 +336,15 @@ export function buildCastle(scene: THREE.Scene, tex: Tex): Castle {
   slot(rx, 1.75, -11.5, -1, 0, 2.0, 1.45);
 
   // ---- 地面の高さ関数 ----
-  const heightAt = (x: number, z: number): number => {
+  // fromY（いまの足元の高さ）から STEP_UP 以内で登れる床のうち、一番高いものを返す。
+  // 中2階の床は下からは届かないので、バルコニーの下は1階の床（0）になる。
+  const heightAt = (x: number, z: number, fromY = Infinity): number => {
     let h = 0;
-    if (Math.abs(x) <= R.stairHalfW && z <= R.stairBottomZ && z >= R.balconyZ) {
-      h = Math.max(h, (R.mez * (R.stairBottomZ - z)) / (R.stairBottomZ - R.balconyZ));
-    }
-    if (z <= R.balconyZ) h = Math.max(h, R.mez);
+    const onStairs = Math.abs(x) <= R.stairHalfW && z <= R.stairBottomZ && z >= R.balconyZ;
+    // 大階段の斜面（下からは壁として効くので高さの制限はしない）
+    if (onStairs) h = Math.max(h, (R.mez * (R.stairBottomZ - z)) / (R.stairBottomZ - R.balconyZ));
+    // 中2階の床（階段のてっぺんから続いているか、届く高さにいるときだけ）
+    if (z <= R.balconyZ && (onStairs || fromY + STEP_UP >= R.mez)) h = Math.max(h, R.mez);
     const ax = -Math.abs(x); // 左右対称なので左側で判定
     if (ax <= -R.alcoveX && z >= R.alcoveZ) h = Math.max(h, R.alcoveH);
     else if (ax > -R.alcoveX && ax <= -R.alcoveX + 1.5 && z >= 10.5 && z <= 15) {

@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { ROOM, type Blocker } from './castle';
+import { ROOM, STEP_UP, type Blocker } from './castle';
 import { PixelSprite } from './sprites';
 
 const GRAVITY = 20;
-const STEP_UP = 0.65; // これ以上の段差は壁扱い
+const STEP_DOWN = 0.5; // これ以下の下り（坂・段）は落ちずに足を着けたまま下りる
 
 /** 歩くキャラの共通部分: 段差・壁の当たり判定、重力、影、ドット絵の向きとコマ送り */
 export class Walker {
@@ -22,20 +22,15 @@ export class Walker {
     sheet: THREE.Texture,
     cellHeight: number,
     protected readonly blockers: Blocker[],
-    protected readonly heightAt: (x: number, z: number) => number,
+    protected readonly heightAt: (x: number, z: number, fromY?: number) => number,
     radius = 0.42,
-    cell: [number, number] = [24, 32],
   ) {
     this.radius = radius;
-    this.pixel = new PixelSprite(sheet, cellHeight, cell[0], cell[1]);
+    this.pixel = new PixelSprite(sheet, cellHeight);
     scene.add(this.pixel.sprite);
     this.shadow = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), new THREE.MeshBasicMaterial({ map: shadowTexture(), transparent: true, depthWrite: false }));
     this.shadow.rotation.x = -Math.PI / 2;
     scene.add(this.shadow);
-  }
-
-  get isGrounded(): boolean {
-    return this.grounded;
   }
 
   /** 位置を直接置く（初期配置用） */
@@ -71,7 +66,8 @@ export class Walker {
 
   /** 重力と着地 */
   physics(dt: number): void {
-    const ground = this.heightAt(this.pos.x, this.pos.z);
+    // 空中では今の高さから見える床（＝中2階の下なら1階の床）へ落ちる
+    const ground = this.heightAt(this.pos.x, this.pos.z, this.pos.y);
     if (!this.grounded || this.pos.y > ground + 0.01) {
       this.vy -= GRAVITY * dt;
       this.pos.y += this.vy * dt;
@@ -91,7 +87,7 @@ export class Walker {
     const r = this.radius;
     const nx = THREE.MathUtils.clamp(this.pos.x + dx, -ROOM.halfW + r, ROOM.halfW - r);
     const nz = THREE.MathUtils.clamp(this.pos.z + dz, ROOM.zBack + r, ROOM.zFront - r);
-    const h = this.heightAt(nx, nz);
+    const h = this.heightAt(nx, nz, this.pos.y);
     if (h > this.pos.y + STEP_UP) return;
     const midY = this.pos.y + 0.6;
     for (const b of this.blockers) {
@@ -100,8 +96,11 @@ export class Walker {
     }
     this.pos.x = nx;
     this.pos.z = nz;
-    if (this.grounded && h < this.pos.y - 0.01) this.grounded = false;
-    if (this.grounded && h > this.pos.y) this.pos.y = h;
+    // 小さな段差・坂は足を着けたまま上り下りする（下り坂で毎フレーム落下扱いにしない）
+    if (this.grounded) {
+      if (h >= this.pos.y - STEP_DOWN) this.pos.y = h;
+      else this.grounded = false;
+    }
   }
 
   /** スプライトと影を現在位置へ。camFwd はカメラの向き（XZ・正規化） */
@@ -113,7 +112,7 @@ export class Walker {
     this.pixel.setFrame(view, frame, flip);
     const bob = this.moving && this.grounded ? Math.abs(Math.sin(this.walkT * Math.PI)) * 0.04 : 0;
     this.pixel.sprite.position.set(this.pos.x, this.pos.y + bob, this.pos.z);
-    const ground = this.heightAt(this.pos.x, this.pos.z);
+    const ground = this.heightAt(this.pos.x, this.pos.z, this.pos.y);
     this.shadow.position.set(this.pos.x, ground + 0.02, this.pos.z);
     const air = THREE.MathUtils.clamp(1 - (this.pos.y - ground) / 3, 0.3, 1);
     this.shadow.scale.setScalar(air);

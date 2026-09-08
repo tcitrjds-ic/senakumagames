@@ -17,6 +17,11 @@ export interface ControlState {
 
 const KEYS = new Set<string>();
 
+export interface ControlsOptions {
+  /** true の間はキー・ボタン・タップを無視する（絵の拡大表示中など） */
+  isBlocked?: () => boolean;
+}
+
 export class Controls {
   private stick = { x: 0, y: 0 };
   private stickId: number | null = null;
@@ -29,6 +34,9 @@ export class Controls {
   private tapQueued: { x: number; y: number } | null = null;
   private sinceOrbit = 999;
   private downInfo = new Map<number, { x: number; y: number; t: number; moved: boolean }>();
+  private readonly isBlocked: () => boolean;
+  /** このフレームの途中で一度でも「無視する状態」だったか（キーを押した瞬間に閉じた場合の対策） */
+  private blockedInFrame = false;
 
   constructor(
     joyArea: HTMLElement,
@@ -37,7 +45,9 @@ export class Controls {
     orbitArea: HTMLElement,
     jumpBtn: HTMLElement,
     lookBtn: HTMLElement,
+    opts: ControlsOptions = {},
   ) {
+    this.isBlocked = opts.isBlocked ?? (() => false);
     const R = 65;
     const down = (e: PointerEvent) => {
       this.downInfo.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now(), moved: false });
@@ -131,8 +141,13 @@ export class Controls {
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
       KEYS.add(e.code);
-      if (e.code === 'Space') this.jumpQueued = true;
-      if (e.code === 'Enter' || e.code === 'KeyF') this.lookQueued = true;
+      // 拡大表示中の Enter / Space / F はビューア側のもの（閉じた勢いで再び開かない）
+      const blocked = this.isBlocked();
+      if (blocked) this.blockedInFrame = true;
+      if (!blocked) {
+        if (e.code === 'Space') this.jumpQueued = true;
+        if (e.code === 'Enter' || e.code === 'KeyF') this.lookQueued = true;
+      }
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
     });
     window.addEventListener('keyup', (e) => KEYS.delete(e.code));
@@ -146,6 +161,14 @@ export class Controls {
   /** 1フレーム分の入力を取り出す（押下フラグはここでリセット） */
   poll(dt: number): ControlState {
     this.sinceOrbit += dt;
+    // このフレームのどこかで拡大表示中だったなら、たまった押下は捨てる
+    if (this.isBlocked() || this.blockedInFrame) {
+      this.jumpQueued = false;
+      this.lookQueued = false;
+      this.tapQueued = null;
+      this.orbitAccum = 0;
+    }
+    this.blockedInFrame = false;
     let sx = this.stick.x;
     let sy = this.stick.y;
     const k = (a: string, b?: string) => KEYS.has(a) || (b !== undefined && KEYS.has(b));
@@ -181,9 +204,5 @@ export class Controls {
     this.lookQueued = false;
     this.tapQueued = null;
     return state;
-  }
-
-  get stickActive(): boolean {
-    return this.stickId !== null;
   }
 }

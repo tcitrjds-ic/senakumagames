@@ -19,10 +19,12 @@ export class Viewer {
   private vhint = $('vhint');
   private current?: HungPainting;
   private lastTap = 0;
+  private lastKeyAt = -1e9;
 
   constructor(
     private readonly camera: THREE.PerspectiveCamera,
     private readonly getTime: () => number,
+    private readonly resolveAsset: (u: string) => string = (u) => u,
   ) {
     $('backdrop').addEventListener('pointerup', () => this.tap());
     this.zoomed.addEventListener('pointerup', () => this.tap());
@@ -32,13 +34,20 @@ export class Viewer {
     });
     window.addEventListener('keydown', (e) => {
       if (this.state === 'closed') return;
+      if (e.code !== 'Escape' && e.code !== 'Space' && e.code !== 'Enter') return;
+      this.lastKeyAt = performance.now();
       if (e.code === 'Escape') this.close();
-      else if (e.code === 'Space' || e.code === 'Enter') this.tap();
+      else this.tap();
     });
   }
 
   get isOpen(): boolean {
     return this.state !== 'closed';
+  }
+
+  /** 操作を横取りしている間（閉じた直後の数フレームも含む）は true */
+  get blocksInput(): boolean {
+    return this.isOpen || performance.now() - this.lastKeyAt < 250;
   }
 
   open(hp: HungPainting, hitUv?: THREE.Vector2): void {
@@ -65,8 +74,7 @@ export class Viewer {
     const s = Math.min(maxW / img.width, maxH / img.height);
     const w = Math.round(img.width * s);
     const h = Math.round(img.height * s);
-    this.img.src = (hp.texture.image as HTMLImageElement).src ?? (hp.texture.image as HTMLCanvasElement).toDataURL?.() ?? '';
-    if (!(hp.texture.image instanceof HTMLImageElement)) this.img.src = (hp.texture.image as HTMLCanvasElement).toDataURL();
+    this.img.src = hp.texture.image instanceof HTMLImageElement ? hp.texture.image.src : (hp.texture.image as HTMLCanvasElement).toDataURL();
     this.img.width = w;
     this.img.height = h;
     this.img.style.width = `${w}px`;
@@ -121,7 +129,7 @@ export class Viewer {
     this.state = 'titled';
     AudioBox.play('chime');
     const p = this.current.painting;
-    const title = p.title ?? (p.image ? '（むだい）' : 'じゅんびちゅう');
+    const title = p.title ?? (this.current.hasImage ? '（むだい）' : 'じゅんびちゅう');
     this.course.textContent = `COURSE ${p.no}`;
     this.ttl.innerHTML = `<span class="star">★</span>${escapeHtml(title)}<span class="star">★</span>`;
     this.band.classList.add('on');
@@ -132,12 +140,11 @@ export class Viewer {
     if (!this.current) return;
     this.state = 'laughed';
     const p = this.current.painting;
-    if (p.laugh) AudioBox.clip(`assets/paintings/${p.laugh}`);
+    if (p.laugh) AudioBox.clip(this.resolveAsset(`assets/paintings/${p.laugh}`));
     else AudioBox.play('pop');
     this.face.classList.add('on');
     this.zoomed.classList.add('shake');
     this.current.burst(0.5, 0.5, 0.05, this.getTime());
-    const vw = window.innerWidth;
     const vh = window.innerHeight;
     for (let i = 0; i < 7; i++) {
       const el = document.createElement('div');
@@ -151,7 +158,6 @@ export class Viewer {
       this.root.appendChild(el);
       window.setTimeout(() => el.remove(), 1900 + i * 140);
     }
-    void vw;
     this.vhint.textContent = p.laugh ? 'タップして とじる' : '（わらいごえは まだ じゅんびちゅう）タップして とじる';
   }
 
