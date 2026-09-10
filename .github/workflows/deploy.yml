@@ -21,8 +21,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # GitHub Actions は 2026-09-23 に Node 20 を削除する。旧版(checkout@v4 /
+      # setup-node@v4 / configure-pages@v5 / deploy-pages@v4)は runs.using が
+      # node20 なので、その日を境にデプロイが動かなくなる。
+      # 出典: github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+      # ※ここの node-version: 22 はビルドに使う Node で、上の話とは別物。
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -34,10 +39,10 @@ jobs:
           cp -r portal/* site/
           cp -r games/runner-2d/dist/* site/runner/
           cp -r games/mancala/dist/* site/mancala/
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
         with:
           enablement: true # 初回実行時にGitHub Pagesを自動で有効化する
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
@@ -49,4 +54,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
