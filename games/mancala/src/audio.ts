@@ -21,9 +21,16 @@ class AudioBoxImpl {
     } catch {
       /* 保存できない環境でも動かす */
     }
+    // タブが裏に回ったら音を止める（BGMのタイマーは裏でも動き続けるため）
+    document.addEventListener('visibilitychange', () => {
+      if (!this.ctx) return;
+      if (document.hidden) void this.ctx.suspend();
+      else void this.ctx.resume();
+    });
   }
 
   private ac(): AudioContext | null {
+    if (document.hidden) return null;
     try {
       if (!this.ctx) this.ctx = new AudioContext();
       if (this.ctx.state === 'suspended') void this.ctx.resume();
@@ -173,7 +180,12 @@ export function addMuteButton(scene: Phaser.Scene, x: number, y: number): void {
     .text(x, y, AudioBox.muted ? '🔇' : '🔊', { fontSize: '22px' })
     .setOrigin(0.5)
     .setDepth(61);
-  bg.setInteractive({ useHandCursor: true });
+  // 見た目は半径24のまま、押せる範囲だけ一回り広げる（スマホで押しやすく）
+  bg.setInteractive({
+    hitArea: new Phaser.Geom.Circle(24, 24, 34),
+    hitAreaCallback: Phaser.Geom.Circle.Contains,
+    useHandCursor: true,
+  });
   bg.on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
     event.stopPropagation(); // 下のジャンプ入力等を発火させない
     const muted = AudioBox.toggleMute();

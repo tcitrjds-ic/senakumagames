@@ -3,21 +3,46 @@ import { AudioBox } from './audio';
 
 export const FONT = '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Yu Gothic UI", system-ui, sans-serif';
 
-/** ホーム（ポータル）へ戻るボタン。デプロイ時は 1つ上の階層 = ポータル */
-export function addHomeButton(scene: Phaser.Scene, x: number, y: number): void {
-  const bg = scene.add.circle(x, y, 24, 0xffffff, 0.9).setDepth(60).setStrokeStyle(3, 0xf0b7c8);
-  scene.add.text(x, y + 1, '🏠', { fontSize: '22px' }).setOrigin(0.5).setDepth(61);
-  bg.setInteractive({ useHandCursor: true });
+/**
+ * 白い丸ボタンの土台。見た目は半径 radius のまま、押せる範囲だけ一回り広げてある
+ * （スマホでは画面が縮小表示されるので、見た目どおりの判定だと指で押しにくい）。
+ */
+export function roundButton(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  onClick: () => void,
+  radius = 24,
+): Phaser.GameObjects.Arc {
+  const bg = scene.add.circle(x, y, radius, 0xffffff, 0.9).setDepth(60).setStrokeStyle(3, 0xf0b7c8);
+  bg.setInteractive({
+    hitArea: new Phaser.Geom.Circle(radius, radius, radius + 10),
+    hitAreaCallback: Phaser.Geom.Circle.Contains,
+    useHandCursor: true,
+  });
   bg.on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
     event.stopPropagation();
+    onClick();
+  });
+  return bg;
+}
+
+/** ホーム（ポータル）へ戻るボタン。デプロイ時は 1つ上の階層 = ポータル */
+export function addHomeButton(scene: Phaser.Scene, x: number, y: number): void {
+  roundButton(scene, x, y, () => {
     AudioBox.play('click');
     window.location.href = '../'; // /runner/・/mancala/ から 1つ上 = ポータル
   });
+  scene.add.text(x, y + 1, '🏠', { fontSize: '22px' }).setOrigin(0.5).setDepth(61);
 }
 
 /** フルスクリーン切替ボタン（コーナーブラケットのアイコン） */
 export function addFullscreenButton(scene: Phaser.Scene, x: number, y: number): void {
-  const bg = scene.add.circle(x, y, 24, 0xffffff, 0.9).setDepth(60).setStrokeStyle(3, 0xf0b7c8);
+  roundButton(scene, x, y, () => {
+    AudioBox.play('click');
+    if (scene.scale.isFullscreen) scene.scale.stopFullscreen();
+    else scene.scale.startFullscreen();
+  });
   const g = scene.add.graphics().setDepth(61);
   g.lineStyle(3.5, 0x8a5a44);
   const s = 8;
@@ -28,13 +53,6 @@ export function addFullscreenButton(scene: Phaser.Scene, x: number, y: number): 
     g.lineTo(x + dx * (s - 5), y + dy * s);
     g.strokePath();
   }
-  bg.setInteractive({ useHandCursor: true });
-  bg.on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
-    event.stopPropagation();
-    AudioBox.play('click');
-    if (scene.scale.isFullscreen) scene.scale.stopFullscreen();
-    else scene.scale.startFullscreen();
-  });
 }
 
 /** 押すと沈む「ぷにっ」としたピルボタン */

@@ -8,7 +8,7 @@ let started = false;
 function boot(): void {
   if (started) return;
   started = true;
-  new Phaser.Game({
+  const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: 'game',
     width: 960,
@@ -20,6 +20,8 @@ function boot(): void {
     },
     scene: [BootScene, GameScene],
   });
+  // 開発時だけ、動作確認スクリプトから状態を読めるようにする（本番ビルドには含まれない）
+  if (import.meta.env.DEV) (window as unknown as { __game: Phaser.Game }).__game = game;
 }
 
 // Canvasに描く前にWebフォントを読み込む（失敗してもフォールバックで起動）

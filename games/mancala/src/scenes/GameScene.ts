@@ -60,7 +60,14 @@ export class GameScene extends Phaser.Scene {
   private display: number[] = [];
   private busy = true;
   private over = false;
+  /** いま選んでいる（光らせている）くぼみ。マウスを乗せた / 指で触れている / キーで選んだ */
   private hovered = -1;
+  /** 押している最中のくぼみ。ここで離すと決定、外へずらして離すとキャンセル */
+  private armed = -1;
+  /** くぼみの上で押し始めたか（指をすべらせて別のくぼみを選び直せるように） */
+  private pressing = false;
+  /** タイトル・結果画面で Enter / スペースを押したときの動作 */
+  private confirmAction?: () => void;
   private pulse = { v: 0 };
   private aiLevel: 0 | 1 | 2 = 1; // よわい / ふつう / つよい
   private cpuMarker?: Phaser.GameObjects.Image;
@@ -98,6 +105,9 @@ export class GameScene extends Phaser.Scene {
     this.busy = true;
     this.over = false;
     this.hovered = -1;
+    this.armed = -1;
+    this.pressing = false;
+    this.confirmAction = undefined;
     this.pulse = { v: 0 };
     this.pitZones = [];
     this.glows = [];
@@ -121,7 +131,62 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: this.pulse, v: 1, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 
     for (let i = 0; i < 14; i++) this.refreshPit(i);
+    this.setupInput();
     this.showTitleOverlay();
+  }
+
+  /** くぼみ以外で指を離したときの後始末と、キーボード操作 */
+  private setupInput(): void {
+    // くぼみの上で離した場合は、くぼみ側の pointerup が先に処理してから ここに来る
+    const release = (): void => {
+      this.pressing = false;
+      this.armed = -1;
+    };
+    this.input.on('pointerup', release);
+    this.input.on('pointerupoutside', release);
+
+    const kb = this.input.keyboard;
+    if (!kb) return;
+    kb.addCapture('SPACE,UP,DOWN,LEFT,RIGHT');
+    kb.on('keydown-LEFT', () => this.moveSelection(-1));
+    kb.on('keydown-RIGHT', () => this.moveSelection(1));
+    const confirm = (e: KeyboardEvent): void => {
+      if (e.repeat) return;
+      if (this.confirmAction) this.confirmAction();
+      else if (this.hovered >= 0) this.onPitClick(this.hovered);
+    };
+    kb.on('keydown-ENTER', confirm);
+    kb.on('keydown-SPACE', confirm);
+    // 1〜6 で左から何番目のくぼみかを直接えらぶ（1回目で選択＋プレビュー、同じ数字をもう1回で決定）
+    ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX'].forEach((name, i) => {
+      kb.on(`keydown-${name}`, (e: KeyboardEvent) => {
+        if (e.repeat || this.busy || this.over || this.confirmAction || this.board[i] === 0) return;
+        if (this.hovered === i) this.onPitClick(i);
+        else this.select(i);
+      });
+    });
+  }
+
+  /** くぼみを選択状態にして、手のプレビューを出す */
+  private select(i: number): void {
+    this.hovered = i;
+    this.hidePreview();
+    this.showPreview(i);
+  }
+
+  /** ←→ で、ポテトが入っているくぼみを順にたどる */
+  private moveSelection(dir: -1 | 1): void {
+    if (this.busy || this.over || this.confirmAction) return;
+    let i = this.hovered;
+    if (i < 0) i = dir > 0 ? -1 : 6;
+    for (let n = 0; n < 6; n++) {
+      i = (i + dir + 6) % 6;
+      if (this.board[i] > 0) {
+        AudioBox.play('tick');
+        this.select(i);
+        return;
+      }
+    }
   }
 
   private buildBoard(): void {
@@ -138,15 +203,25 @@ export class GameScene extends Phaser.Scene {
         const glow = this.add.image(x, y, 'glow').setDepth(2).setAlpha(0).setScale(0.72);
         this.glows[i] = glow;
         pit.setInteractive({ useHandCursor: true });
+        // 押した瞬間ではなく「離したとき」に決定する。
+        // スマホでも 触れる→結果のプレビューを見る→離して決定 / 外へずらしてキャンセル ができる
         pit.on('pointerover', () => {
-          this.hovered = i;
-          this.showPreview(i);
+          this.select(i);
+          if (this.pressing) this.armed = i; // 押したまま別のくぼみへすべらせたら選び直し
         });
         pit.on('pointerout', () => {
           if (this.hovered === i) this.hovered = -1;
+          if (this.armed === i) this.armed = -1;
           this.hidePreview();
         });
-        pit.on('pointerdown', () => this.onPitClick(i));
+        pit.on('pointerdown', () => {
+          this.pressing = true;
+          this.armed = i;
+          this.select(i);
+        });
+        pit.on('pointerup', () => {
+          if (this.armed === i) this.onPitClick(i);
+        });
       }
       this.pitZones[i] = pit;
       this.seedLayers[i] = this.add.container(x, y).setDepth(5);
@@ -196,7 +271,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private showPreview(i: number): void {
-    if (this.busy || this.over || this.board[i] === 0) return;
+    if (this.busy || this.over || this.confirmAction || this.board[i] === 0) return;
     const r = computeMove(this.board, i, 'player');
     const last = r.path[r.path.length - 1];
     const pos = this.pitPos(last);
@@ -316,7 +391,8 @@ export class GameScene extends Phaser.Scene {
       const glow = this.glows[i];
       if (!glow) continue;
       const clickable = !this.busy && !this.over && this.board[i] > 0;
-      glow.setAlpha(clickable ? (this.hovered === i ? 0.85 : 0.2 + 0.3 * this.pulse.v) : 0);
+      const strong = this.armed === i ? 1 : 0.85; // 押している間はいちばん明るく
+      glow.setAlpha(clickable ? (this.hovered === i ? strong : 0.2 + 0.3 * this.pulse.v) : 0);
     }
   }
 
@@ -341,7 +417,8 @@ export class GameScene extends Phaser.Scene {
     panel.lineStyle(4, 0xf0b7c8).strokeRoundedRect(150, 142, 660, 216, 24);
     items.push(panel);
     const rules = [
-      '🍟 じぶんの列（した）のくぼみをタップして、ポテトを反時計まわりに1つずつまく',
+      // 折り返しは空白の位置でだけ起きる。空白が無いと絵文字だけが1行目に取り残される
+      '🍟 じぶんの列（した）のくぼみを えらぶと、ポテトを 反時計まわりに 1つずつ まくよ',
       '🍟 さいごの1つが みぎのゴールに入ったら もういっかい！',
       '🍟 さいごの1つが じぶんの空きマスなら、向かいのポテトを横取り！',
       '🍟 ゴールのポテトが多いほうの勝ち！',
@@ -398,10 +475,19 @@ export class GameScene extends Phaser.Scene {
     };
     renderChips();
 
+    items.push(
+      this.add
+        .text(W / 2, 426, 'キーボード：←→ でえらぶ ／ Enter でけってい ／ 1〜6 でちょくせつ えらぶ', {
+          fontFamily: FONT, fontSize: '15px', fontStyle: 'bold', color: '#ffffff',
+        })
+        .setOrigin(0.5).setStroke('#8a5a44', 5).setDepth(52),
+    );
+
     let begun = false;
     const begin = (): void => {
       if (begun) return;
       begun = true;
+      this.confirmAction = undefined;
       items.forEach((o) => o.destroy());
       chips.forEach((c) => c.destroy());
       btn.destroy();
@@ -425,17 +511,23 @@ export class GameScene extends Phaser.Scene {
       );
     };
     const btn = pillButton(this, W / 2, 472, 300, 62, 'あそぶ！', begin);
+    this.confirmAction = begin; // Enter / スペースでも開始
   }
 
   private startPlayerTurn(message: string): void {
     this.busy = false;
     this.setTurnBanner('あなたのばん！', 0x5b8a3c);
     this.say(message);
+    // マウスや指が乗ったままのくぼみ・キーで選んでいたくぼみは、そのまま次の手のプレビューを出す
+    if (this.hovered >= 0 && this.board[this.hovered] > 0) this.showPreview(this.hovered);
+    else this.hovered = -1;
   }
 
   private onPitClick(i: number): void {
-    if (this.busy || this.over || this.board[i] === 0) return;
+    if (this.busy || this.over || this.confirmAction || this.board[i] === 0) return;
     this.busy = true;
+    this.armed = -1;
+    this.pressing = false;
     this.setTurnBanner('', undefined);
     this.hidePreview();
     this.cpuMarker?.destroy();
@@ -744,13 +836,17 @@ export class GameScene extends Phaser.Scene {
       this.time.delayedCall(2200, () => confetti.stop());
     }
 
+    let leaving = false;
     const again = (): void => {
+      if (leaving) return; // タップとキーが同時でも1回だけ
+      leaving = true;
       this.cameras.main.fadeOut(240, 255, 238, 245);
       this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => this.scene.restart());
     };
     pillButton(this, W / 2, H / 2 + 118, 280, 62, 'もういちど！', again);
     this.time.delayedCall(600, () => {
       this.input.once('pointerdown', again);
+      this.confirmAction = again; // Enter / スペースでも もういちど
     });
   }
 }

@@ -12,7 +12,13 @@
         height: 100%;
         background: #ffeef5;
         overflow: hidden;
-        touch-action: manipulation;
+        /* 連打やスワイプでページが動いたり、長押しで選択メニューが出たりしないように */
+        touch-action: none;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
       }
       #game {
         width: 100%;
