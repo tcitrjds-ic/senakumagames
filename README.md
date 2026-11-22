@@ -10,8 +10,9 @@ YouTuber「せなくま」さん（[せなくまチャンネル](https://www.you
 
 1. **せなくまラン 🍟** — 2D横スクロールランナー（Phaser 3）… **プレイ可能** ✅
 2. **せなくまとマンカラ 🥔** — せなくまと対戦するマンカラ（カラハ・ルール）… **プレイ可能** ✅
-3. **せなくまアイランド 🏝️** — 3D箱庭探索ゲーム（Three.js + VRM）… 未着手
-4. **Webポータル** — 各ゲームの入口となるページ（`portal/`）… **公開用に実装済み** ✅
+3. **せなくま美術館 🖼️** — 3Dの館内ホールを せなくまで歩き回り、壁の絵を鑑賞するゲーム（Three.js）… **枠は完成・絵の投入待ち**
+4. **せなくまアイランド 🏝️** — 3D箱庭探索ゲーム（Three.js + VRM）… 未着手
+5. **Webポータル** — 各ゲームの入口となるページ（`portal/`）… **公開用に実装済み** ✅
 
 ## 開発の始め方
 
@@ -19,7 +20,8 @@ YouTuber「せなくま」さん（[せなくまチャンネル](https://www.you
 npm install
 npm run dev            # せなくまラン の開発サーバー
 npm run dev:mancala    # せなくまとマンカラ の開発サーバー
-npm run build          # 両ゲームの本番ビルド（games/*/dist/）
+npm run dev:gallery    # せなくま美術館 の開発サーバー
+npm run build          # 全ゲームの本番ビルド（games/*/dist/）
 ```
 
 ## 操作方法
@@ -63,9 +65,9 @@ npm test    # ジャンプ入力・障害物の出現間隔・マンカラの石
 
 ## 公開（GitHub Pages）
 
-`.github/workflows/deploy.yml` が、ポータル（`portal/`）と両ゲームを
+`.github/workflows/deploy.yml` が、ポータル（`portal/`）と各ゲームを
 まとめてGitHub Pagesへデプロイします。サイト構成は
-`/`（ポータル）→ `/runner/`・`/mancala/`（各ゲーム）。
+`/`（ポータル）→ `/runner/`・`/mancala/`・`/gallery/`（各ゲーム）。
 
 初回のみ設定が必要です:
 
@@ -76,13 +78,38 @@ npm test    # ジャンプ入力・障害物の出現間隔・マンカラの石
 
 公開URL: `https://<ユーザー名>.github.io/senakumagames/`
 
+## せなくま美術館に絵を飾る
+
+`games/gallery/public/assets/paintings/` に絵（画像）と笑い声の音声を置き、
+同じ場所の `manifest.json` にファイル名と題名を書くだけで館内ホールの壁に掛かります（コード変更不要）。
+書き方と、飾る絵の権利の注意は [games/gallery/public/assets/paintings/README.md](./games/gallery/public/assets/paintings/README.md) を参照。
+
+- 操作: 左半分のバーチャルスティックで歩く／右半分ドラッグでカメラ回転／A でジャンプ（PC は WASD・矢印・Q/E・Space）
+- 絵に近づいて「みる」（または絵をタップ）→ 拡大 → タップで題名 → タップで笑い声 → タップで閉じる
+- 掛けられる場所は 16 か所（奥のステージの壁 → つい立ての内側 → 左右の壁 → つい立ての外側 → 玄関側の壁 の順に埋まる）
+- 建物の外観と館内の素材（寄木の床・腰板・壁紙・天窓・扉・窓・クマの紋章）は `tools/make_gallery_assets.py` で生成
+- 歩くキャラ（せなくま・ポテトくん・くまの学芸員・うさぎの絵かき・ひよこ）のドット絵は `tools/make_pixel_chars.py` で生成（3方向×3コマのシート）。住人は館内を自動で歩き回り、近づくとこちらを向く
+
+建物・内装・住人は、すべてこの美術館のために作ったオリジナルです（せなくまチャンネルのモチーフ＝クマ耳とポテトから発想）。
+
+## 他社の著作物を入れないための決まり
+
+せなくまさんの許諾で使えるのは、せなくまさん自身の絵・写真・声だけです。次のものは入れません。
+
+- ほかのゲームのキャラクター（見た目・名前）。ドット絵に描き直しても同じです
+- ほかのゲームの場所や建物を、間取りや模様ごと写したもの
+- ほかのゲームのロゴ・タイトル・音楽・効果音
+- ゲーム画面やロゴが写った画像（実況のサムネイル原本を含む）。原本は `assets/raw/` に置かず手元で保管します
+
+遊び方やジャンル（横スクロールで走る、館内を歩いて絵を見る、など）は誰のものでもないので自由に使えます。
+
 ## キャラクター画像
 
 | ゲーム | ファイル | 内容 | 作り方 |
 |---|---|---|---|
 | せなくまラン | `hero.png` + `hero.json` | 主人公のドット絵（正面顔・9コマ: 立ち/まばたき/走り4コマ/ジャンプ/落下/ミス） | `python3 tools/make_hero_sprite.py`（ビーズ作品 `assets/raw/senakuma_beads_reference.png` を見本に描き起こし） |
-| せなくまラン・マンカラ | `face_cry.png` / `face_laugh.png` | 丸型カットイン（泣き顔・笑い顔） | TotK実況サムネから `tools/make_faces.py` |
-| マンカラ | `player.png` / `player_jump.png` | せなくまのアバター（通常・ウインク） | サムネイルからの切り抜き（`tools/traced_masks.py` + `tools/cut_traced.py`） |
+| せなくまラン・マンカラ・美術館 | `face_cry.png` / `face_laugh.png` | 丸型カットイン（泣き顔・笑い顔）。せなくまさんの顔だけを丸く切り出したもの | 実況サムネイルから `tools/make_faces.py`（原本は手元保管） |
+| マンカラ | `player.png` / `player_jump.png` | せなくまのアバター（通常・ウインク） | サムネイルからの切り抜き（`tools/traced_masks.py` + `tools/cut_traced.py`）→ ふちに残る背景の切れ端を `tools/clean_cutout_edges.py` で除去 |
 | マンカラ | `board.png` / `seeds.png` / `felt.png` ほか | 木製の盤・ポテト石・フェルトのテーブル・光る輪 | `python3 tools/make_mancala_assets.py`（要 `numpy`） |
 
 主人公のドット絵を直すときは `tools/make_hero_sprite.py` の文字グリッド（頭・胴・腕・脚の
@@ -91,3 +118,4 @@ npm test    # ジャンプ入力・障害物の出現間隔・マンカラの石
 
 > キャラクター画像は権利者（せなくまさん）の許諾を得て使用します。素材を追加する際は
 > `assets/raw/sources.txt` に出典を記録してください（詳細は GAME_PLAN.md セクション2参照）。
+> ゲーム画面やロゴが写ったサムネイル原本は、リポジトリには入れません（`assets/raw/README.md`）。

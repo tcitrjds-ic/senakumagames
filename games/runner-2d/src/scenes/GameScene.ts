@@ -627,7 +627,7 @@ export class GameScene extends Phaser.Scene {
     const hx = this.hero.x;
     const hy = this.hero.y - 60; // 体のまんなかあたり
 
-    // 集めたポテトがばら撒かれる（ソニック式の喪失感）
+    // 集めたポテトがばら撒かれる（失ったことが目で分かるように）
     const drops = Math.min(this.score, 8);
     for (let i = 0; i < drops; i++) {
       const p = this.add.image(hx, hy, 'potato').setScale(0.3).setDepth(13);

@@ -4,3 +4,5 @@ __pycache__/
 *.pyc
 .DS_Store
 .vite/
+# 実況サムネイルの原本（ゲーム会社のロゴ・キャラクターが写るため公開しない。assets/raw/README.md 参照）
+assets/raw/thumb_*
