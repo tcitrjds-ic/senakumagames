@@ -11,6 +11,8 @@ import { pillButton, addFullscreenButton, addHomeButton } from '../ui';
 export class PauseScene extends Phaser.Scene {
   private menu: Phaser.GameObjects.GameObject[] = [];
   private leaving = false;
+  /** 再開のカウントダウン中か */
+  private counting = false;
 
   constructor() {
     super('Pause');
@@ -18,6 +20,7 @@ export class PauseScene extends Phaser.Scene {
 
   create(): void {
     this.leaving = false;
+    this.counting = false;
     this.menu = [];
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x553a2e, 0.55);
 
@@ -41,6 +44,18 @@ export class PauseScene extends Phaser.Scene {
     addMuteButton(this, GAME_WIDTH - 36, 36);
     addFullscreenButton(this, GAME_WIDTH - 36, 92);
 
+    // 再開のカウントダウン中に別のタブやアプリへ移ったら、数えるのをやめてメニューに戻す
+    // （見ていない間にゲームが再開してしまわないように）
+    const backToMenu = (): void => {
+      if (this.counting) this.scene.restart();
+    };
+    this.game.events.on(Phaser.Core.Events.BLUR, backToMenu);
+    this.game.events.on(Phaser.Core.Events.HIDDEN, backToMenu);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.events.off(Phaser.Core.Events.BLUR, backToMenu);
+      this.game.events.off(Phaser.Core.Events.HIDDEN, backToMenu);
+    });
+
     const kb = this.input.keyboard;
     if (kb) {
       for (const code of ['SPACE', 'ENTER', 'P', 'ESC']) {
@@ -55,6 +70,7 @@ export class PauseScene extends Phaser.Scene {
   private resumeGame(): void {
     if (this.leaving) return;
     this.leaving = true;
+    this.counting = true;
     this.menu.forEach((o) => (o as unknown as Phaser.GameObjects.Components.Visible).setVisible(false));
     const count = this.add
       .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, '', {
@@ -65,6 +81,7 @@ export class PauseScene extends Phaser.Scene {
     let n = 3;
     const tick = (): void => {
       if (n === 0) {
+        this.counting = false;
         this.scene.resume('Game');
         this.scene.stop();
         return;

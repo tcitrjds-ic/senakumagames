@@ -1,7 +1,7 @@
 import '@fontsource/m-plus-rounded-1c/400.css';
 import '@fontsource/m-plus-rounded-1c/700.css';
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT } from './constants';
+import { GAME_WIDTH, GAME_HEIGHT, EVT_OUTSIDE_DOWN, EVT_OUTSIDE_UP } from './constants';
 import { BootScene } from './scenes/BootScene';
 import { TitleScene } from './scenes/TitleScene';
 import { GameScene } from './scenes/GameScene';
@@ -31,6 +31,19 @@ function boot(): void {
     },
     scene: [BootScene, TitleScene, GameScene, GameOverScene, PauseScene],
   });
+  // キャンバスの外を押してもジャンプ・スタートできるようにする。
+  // スマホを縦に持つとゲーム画面は細い帯になり、その外（指を置きやすい下側）が広く余るため。
+  document.addEventListener('pointerdown', (e) => {
+    if (e.target instanceof HTMLCanvasElement) return; // キャンバス上は Phaser が処理する
+    game.events.emit(EVT_OUTSIDE_DOWN, e.pointerId);
+  });
+  // 離すほうは場所を問わず流す（外で押してキャンバス上で離しても、押しっぱなし扱いが残らないように）
+  const outsideUp = (e: PointerEvent): void => {
+    game.events.emit(EVT_OUTSIDE_UP, e.pointerId);
+  };
+  document.addEventListener('pointerup', outsideUp);
+  document.addEventListener('pointercancel', outsideUp);
+
   // 開発時だけ、動作確認スクリプトから状態を読めるようにする（本番ビルドには含まれない）
   if (import.meta.env.DEV) (window as unknown as { __game: Phaser.Game }).__game = game;
 }

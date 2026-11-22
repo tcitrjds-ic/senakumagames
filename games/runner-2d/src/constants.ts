@@ -27,6 +27,13 @@ export const JUMP_TUNING = {
   maxJumps: 2,
 };
 
+/**
+ * キャンバスの外（スマホ縦持ち時の上下の余白など）が押された/離されたときに
+ * game.events へ流すイベント名。main.ts が発行し、各シーンがジャンプや開始に使う。
+ */
+export const EVT_OUTSIDE_DOWN = 'outside-down';
+export const EVT_OUTSIDE_UP = 'outside-up';
+
 export const FONT_FAMILY =
   '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Yu Gothic UI", system-ui, sans-serif';
 

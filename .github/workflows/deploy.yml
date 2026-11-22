@@ -32,6 +32,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # ジャンプ入力と障害物の出現間隔のロジック検証。落ちたらデプロイしない
+      - run: npm test
       - run: npm run build
       - name: サイトを組み立て（/ = ポータル, /runner/, /mancala/）
         run: |

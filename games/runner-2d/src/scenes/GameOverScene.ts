@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, FONT_FAMILY } from '../constants';
+import { GAME_WIDTH, GAME_HEIGHT, FONT_FAMILY, EVT_OUTSIDE_DOWN } from '../constants';
 import { AudioBox, addMuteButton } from '../audio';
 import { buildBackground, pillButton, fadeStart, addFullscreenButton, addHomeButton } from '../ui';
 
@@ -33,9 +33,10 @@ export class GameOverScene extends Phaser.Scene {
         fontFamily: FONT_FAMILY, fontSize: '42px', fontStyle: 'bold', color: '#8a5a44',
       })
       .setOrigin(0.5);
-    const potato = this.add.image(-72, -38, 'potato').setScale(0.4);
+    // 行の間隔: ハイスコアの行が「もういちど！」ボタン(上端 +57)に重ならない位置に置く
+    const potato = this.add.image(-72, -46, 'potato').setScale(0.4);
     const score = this.add
-      .text(-30, -38, '× 0', {
+      .text(-30, -46, '× 0', {
         fontFamily: FONT_FAMILY, fontSize: '40px', fontStyle: 'bold', color: '#e2504d',
       })
       .setOrigin(0, 0.5);
@@ -52,18 +53,18 @@ export class GameOverScene extends Phaser.Scene {
     // スコアに応じたメダル
     const medalKey = data.score >= 30 ? 'medal_gold' : data.score >= 15 ? 'medal_silver' : data.score >= 5 ? 'medal_bronze' : null;
     if (medalKey) {
-      const medal = this.add.image(-172, -30, medalKey).setScale(0).setAngle(-8);
+      const medal = this.add.image(-172, -36, medalKey).setScale(0).setAngle(-8);
       card.add(medal);
       this.tweens.add({ targets: medal, scale: 1, duration: 420, delay: 900, ease: 'Back.easeOut' });
       if (medalKey === 'medal_gold') this.time.delayedCall(900, () => AudioBox.play('capture'));
     }
     const distLine = this.add
-      .text(0, 8, `はしったきょり ${data.distance}m`, {
+      .text(0, -4, `はしったきょり ${data.distance}m`, {
         fontFamily: FONT_FAMILY, fontSize: '20px', fontStyle: 'bold', color: '#7aa1c4',
       })
       .setOrigin(0.5);
     const bestLine = this.add
-      .text(0, 44, data.isNewBest ? '✨ ハイスコア更新！ ✨' : `ハイスコア ${data.best}`, {
+      .text(0, 28, data.isNewBest ? '✨ ハイスコア更新！ ✨' : `ハイスコア ${data.best}`, {
         fontFamily: FONT_FAMILY, fontSize: '24px', fontStyle: 'bold',
         color: data.isNewBest ? '#e5a715' : '#a97c8c',
       })
@@ -71,7 +72,8 @@ export class GameOverScene extends Phaser.Scene {
     card.add([title, potato, score, distLine, bestLine]);
 
     // 笑い顔カットイン（カード上端に重ねる）
-    const face = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 140, 'face_laugh').setDepth(51).setScale(0);
+    // 「おつかれさま！」の文字にかからない高さに置く
+    const face = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 156, 'face_laugh').setDepth(51).setScale(0);
     this.tweens.add({
       targets: face,
       scale: 130 / face.height,
@@ -135,6 +137,10 @@ export class GameOverScene extends Phaser.Scene {
       this.input.keyboard?.on('keydown-SPACE', retry);
       this.input.keyboard?.on('keydown-ENTER', retry);
       this.input.keyboard?.on('keydown-ESC', () => go('Title'));
+      // キャンバスの外（縦持ち時の余白）でも同じ
+      const outside = (): void => go('Game');
+      this.game.events.on(EVT_OUTSIDE_DOWN, outside);
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off(EVT_OUTSIDE_DOWN, outside));
     });
     this.input.keyboard?.addCapture('SPACE,UP,DOWN');
   }

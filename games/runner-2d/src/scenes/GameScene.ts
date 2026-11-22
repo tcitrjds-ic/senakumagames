@@ -9,6 +9,8 @@ import {
   HITBOX_WIDTH,
   HITBOX_HEIGHT,
   JUMP_TUNING,
+  EVT_OUTSIDE_DOWN,
+  EVT_OUTSIDE_UP,
   FONT_FAMILY,
   loadHighScore,
   saveHighScore,
@@ -268,11 +270,20 @@ export class GameScene extends Phaser.Scene {
       this.held.clear();
       this.jumpCtl.reset();
     };
+    // キャンバスの外（縦持ち時の余白）を押してもジャンプ。ポーズ中は受け付けない
+    const outsideDown = (id: number): void => {
+      if (this.scene.isActive()) this.pressJump(`o${id}`);
+    };
+    const outsideUp = (id: number): void => this.releaseJump(`o${id}`);
+    this.game.events.on(EVT_OUTSIDE_DOWN, outsideDown);
+    this.game.events.on(EVT_OUTSIDE_UP, outsideUp);
     this.game.events.on(Phaser.Core.Events.BLUR, autoPause);
     this.game.events.on(Phaser.Core.Events.HIDDEN, autoPause);
     this.events.on(Phaser.Scenes.Events.RESUME, onResume);
     // シーンをやり直すたびに登録が積み重ならないよう、終了時に外す
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.events.off(EVT_OUTSIDE_DOWN, outsideDown);
+      this.game.events.off(EVT_OUTSIDE_UP, outsideUp);
       this.game.events.off(Phaser.Core.Events.BLUR, autoPause);
       this.game.events.off(Phaser.Core.Events.HIDDEN, autoPause);
       this.events.off(Phaser.Scenes.Events.RESUME, onResume);

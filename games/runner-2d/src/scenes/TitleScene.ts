@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, FLOOR_TOP, FONT_FAMILY, loadHighScore } from '../constants';
+import { GAME_WIDTH, FLOOR_TOP, FONT_FAMILY, EVT_OUTSIDE_DOWN, loadHighScore } from '../constants';
 import { AudioBox, addMuteButton } from '../audio';
 import { buildBackground, pillButton, fadeStart, addFullscreenButton, addHomeButton, addHero } from '../ui';
 
@@ -147,9 +147,13 @@ export class TitleScene extends Phaser.Scene {
     addFullscreenButton(this, GAME_WIDTH - 36, 92);
 
     // 画面のどこをタップしてもスタートできる（ボタン類はstopPropagationで除外される）
-    this.input.once('pointerdown', () => {
+    const tapStart = (): void => {
       AudioBox.play('click');
       start();
-    });
+    };
+    this.input.once('pointerdown', tapStart);
+    // キャンバスの外（縦持ち時の余白）でも同じ
+    this.game.events.on(EVT_OUTSIDE_DOWN, tapStart);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off(EVT_OUTSIDE_DOWN, tapStart));
   }
 }

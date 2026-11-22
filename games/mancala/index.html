@@ -20,12 +20,28 @@
         -webkit-touch-callout: none;
         -webkit-tap-highlight-color: transparent;
       }
+      /* 中央寄せは Phaser(autoCenter) が行う。ここでも flex で寄せると二重に効いて中央からずれる */
       #game {
         width: 100%;
         height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+      }
+      /* スマホを縦に持っているときだけ出す案内（画面が小さくなるため） */
+      #rotate-hint {
+        display: none;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 14%;
+        margin: 0;
+        text-align: center;
+        font: 700 15px/1.9 "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", system-ui, sans-serif;
+        color: #c06a7a;
+        pointer-events: none;
+      }
+      @media (orientation: portrait) and (max-width: 640px) {
+        #rotate-hint {
+          display: block;
+        }
       }
       canvas {
         border-radius: 8px;
@@ -34,6 +50,7 @@
   </head>
   <body>
     <div id="game"></div>
+    <p id="rotate-hint">📱 よこむきにすると 大きく あそべるよ</p>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
