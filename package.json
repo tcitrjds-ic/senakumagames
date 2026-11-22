@@ -9,7 +9,8 @@
     "dev:mancala": "npm --workspace mancala run dev",
     "build": "npm --workspace runner-2d run build && npm --workspace mancala run build",
     "preview": "npm --workspace runner-2d run preview",
-    "preview:mancala": "npm --workspace mancala run preview"
+    "preview:mancala": "npm --workspace mancala run preview",
+    "test": "node --test \"games/runner-2d/tests/*.test.ts\""
   },
   "dependencies": {
     "@fontsource/m-plus-rounded-1c": "^5.2.10"

@@ -5,8 +5,27 @@ export const GAME_HEIGHT = 540;
 export const GROUND_HEIGHT = 96;
 export const FLOOR_TOP = GAME_HEIGHT - GROUND_HEIGHT;
 
-/** プレイヤー表示の高さ(px)。差し替えた画像も縦横比を保ってこの高さに揃える */
-export const PLAYER_HEIGHT = 110;
+/** プレイヤーの立ち位置(x) */
+export const PLAYER_X = 180;
+
+/** 主人公スプライトの表示倍率（hero.png は 1マス7px。0.5倍 = 1マス3.5px） */
+export const HERO_SCALE = 0.5;
+
+/**
+ * 当たり判定の大きさ(px)。見た目のスプライトとは別に固定サイズで持つ。
+ * 体と顔の幅に合わせ、耳と髪のてっぺんは判定から外している（かすっただけではミスにしない）。
+ */
+export const HITBOX_WIDTH = 40;
+export const HITBOX_HEIGHT = 92;
+
+/** ジャンプの手ざわり（jump.ts の JumpTuning） */
+export const JUMP_TUNING = {
+  jumpVelocity: -750,
+  cutVelocity: -260,
+  minRiseMs: 140,
+  bufferMs: 130,
+  maxJumps: 2,
+};
 
 export const FONT_FAMILY =
   '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Yu Gothic UI", system-ui, sans-serif';

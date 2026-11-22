@@ -80,18 +80,29 @@ export class GameOverScene extends Phaser.Scene {
       ease: 'Back.easeOut',
     });
 
-    pillButton(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 118, 280, 62, 'もういちど！', () => fadeStart(this, 'Game'));
+    let leaving = false;
+    const go = (key: 'Game' | 'Title'): void => {
+      if (leaving) return; // タップとキーが同時でも遷移は1回だけ
+      leaving = true;
+      fadeStart(this, key);
+    };
+    pillButton(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 118, 280, 62, 'もういちど！', () => go('Game'));
     const toTitle = this.add
       .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 176, 'タイトルへもどる', {
         fontFamily: FONT_FAMILY, fontSize: '19px', color: '#a97c8c',
       })
       .setOrigin(0.5)
       .setDepth(55);
-    toTitle.setInteractive({ useHandCursor: true });
+    // 文字だけだと指で押しにくいので、判定を上下左右に広げる
+    toTitle.setInteractive({
+      hitArea: new Phaser.Geom.Rectangle(-40, -12, toTitle.width + 80, toTitle.height + 24),
+      hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+      useHandCursor: true,
+    });
     toTitle.on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, e: Phaser.Types.Input.EventData) => {
       e.stopPropagation();
       AudioBox.play('click');
-      fadeStart(this, 'Title');
+      go('Title');
     });
 
     addHomeButton(this, 40, 40);
@@ -115,9 +126,16 @@ export class GameOverScene extends Phaser.Scene {
     }
 
     // 少し待ってから、画面のどこをタップしてもリトライできるように
+    // （ミスした瞬間の連打でリザルトを飛ばしてしまわないための待ち）
     this.time.delayedCall(600, () => {
-      this.input.once('pointerdown', () => fadeStart(this, 'Game'));
-      this.input.keyboard?.once('keydown-SPACE', () => fadeStart(this, 'Game'));
+      this.input.on('pointerdown', () => go('Game'));
+      const retry = (e: KeyboardEvent): void => {
+        if (!e.repeat) go('Game');
+      };
+      this.input.keyboard?.on('keydown-SPACE', retry);
+      this.input.keyboard?.on('keydown-ENTER', retry);
+      this.input.keyboard?.on('keydown-ESC', () => go('Title'));
     });
+    this.input.keyboard?.addCapture('SPACE,UP,DOWN');
   }
 }

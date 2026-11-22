@@ -1,13 +1,7 @@
 import Phaser from 'phaser';
-import {
-  GAME_WIDTH,
-  FLOOR_TOP,
-  PLAYER_HEIGHT,
-  FONT_FAMILY,
-  loadHighScore,
-} from '../constants';
+import { GAME_WIDTH, FLOOR_TOP, FONT_FAMILY, loadHighScore } from '../constants';
 import { AudioBox, addMuteButton } from '../audio';
-import { buildBackground, pillButton, fadeStart, addFullscreenButton, addHomeButton } from '../ui';
+import { buildBackground, pillButton, fadeStart, addFullscreenButton, addHomeButton, addHero } from '../ui';
 
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -31,26 +25,20 @@ export class TitleScene extends Phaser.Scene {
       frequency: 900,
     });
 
-    this.add.image(GAME_WIDTH / 2, FLOOR_TOP + 8, 'shadow').setAlpha(0.4);
-    const player = this.add.image(GAME_WIDTH / 2, FLOOR_TOP - PLAYER_HEIGHT / 2 + 4, 'player');
-    player.setScale(PLAYER_HEIGHT / player.height);
+    // 主人公はボタンや説明文に隠れない左下に、ゲーム中より大きく立たせる
+    const heroX = 150;
+    this.add.image(heroX, FLOOR_TOP + 8, 'shadow').setAlpha(0.4).setScale(1.3);
+    const hero = addHero(this, heroX, FLOOR_TOP, 0.75);
+    hero.play('hero-idle'); // ときどき まばたき
+    // 息づかい: 足元を軸にゆっくり伸び縮み
     this.tweens.add({
-      targets: player,
-      y: player.y - 12,
-      angle: { from: -2.5, to: 2.5 },
-      duration: 750,
+      targets: hero,
+      scaleY: 0.75 * 1.03,
+      scaleX: 0.75 * 0.985,
+      duration: 900,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
-    });
-    // その場でとてとて足踏みする待機モーション（player ⇄ player_run）
-    this.time.addEvent({
-      delay: 260,
-      loop: true,
-      callback: () => {
-        player.setTexture(player.texture.key === 'player' ? 'player_run' : 'player');
-        player.setScale(PLAYER_HEIGHT / player.height);
-      },
     });
 
     // デザインロゴ: 1文字ずつ色を変えてアーチ状に並べ、波打たせる
@@ -97,20 +85,37 @@ export class TitleScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setStroke('#ffffff', 6);
 
+    let started = false;
     const start = (): void => {
+      if (started) return; // タップとキーが同時でも1回だけ
+      started = true;
       AudioBox.startMusic();
       AudioBox.voice('start'); // ボイスが配置されていれば「スタート！」
+      // スタートの合図に ぴょんと跳ねる
+      hero.anims.stop();
+      hero.setFrame('jump');
+      this.tweens.add({ targets: hero, y: FLOOR_TOP - 70, duration: 220, yoyo: true, ease: 'Quad.easeOut' });
       fadeStart(this, 'Game');
     };
     pillButton(this, GAME_WIDTH / 2, 318, 340, 72, 'タップで スタート！', start);
-    this.input.keyboard?.once('keydown-SPACE', () => {
+    const keyStart = (e: KeyboardEvent): void => {
+      if (e.repeat) return;
       AudioBox.play('click');
       start();
-    });
+    };
+    this.input.keyboard?.on('keydown-SPACE', keyStart);
+    this.input.keyboard?.on('keydown-ENTER', keyStart);
+    this.input.keyboard?.addCapture('SPACE,UP,DOWN');
 
     this.add
-      .text(GAME_WIDTH / 2, 372, 'タップ＝ジャンプ ／ 2かいタップで 2だんジャンプ', {
+      .text(GAME_WIDTH / 2, 376, 'タップ：ジャンプ ／ ながおし：たかく ／ くうちゅうで もういちど', {
         fontFamily: FONT_FAMILY, fontSize: '16px', color: '#7d95ab',
+      })
+      .setOrigin(0.5)
+      .setStroke('#ffffff', 5);
+    this.add
+      .text(GAME_WIDTH / 2, 402, 'キーボード：スペース / ↑ でジャンプ・P でポーズ', {
+        fontFamily: FONT_FAMILY, fontSize: '14px', color: '#8fa3b5',
       })
       .setOrigin(0.5)
       .setStroke('#ffffff', 5);

@@ -3,7 +3,7 @@ import { GAME_WIDTH, GAME_HEIGHT, FONT_FAMILY } from '../constants';
 
 /**
  * アセット読み込みシーン。
- * player.png / player_jump.png を差し替えるだけでキャラクターが置き換わる。
+ * 主人公は hero.png + hero.json（tools/make_hero_sprite.py が生成する atlas）。
  */
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -54,14 +54,28 @@ export class BootScene extends Phaser.Scene {
     this.load.image('shadow', 'assets/shadow.png');
     this.load.image('sparkle', 'assets/sparkle.png');
     this.load.image('dust', 'assets/dust.png');
-    this.load.image('player', 'assets/player.png');
-    this.load.image('player_run', 'assets/player_run.png');
-    this.load.image('player_jump', 'assets/player_jump.png');
+    this.load.atlas('hero', 'assets/hero.png', 'assets/hero.json');
     this.load.image('face_cry', 'assets/face_cry.png');
     this.load.image('face_laugh', 'assets/face_laugh.png');
   }
 
   create(): void {
+    // 立ち: ときどき まばたき
+    this.anims.create({
+      key: 'hero-idle',
+      frames: [
+        { key: 'hero', frame: 'idle_0', duration: 2400 },
+        { key: 'hero', frame: 'idle_1', duration: 130 },
+      ],
+      repeat: -1,
+    });
+    // 走り: 4コマ（踏み出し → 入れ替え → 反対の踏み出し → 入れ替え）
+    this.anims.create({
+      key: 'hero-run',
+      frames: ['run_0', 'run_1', 'run_2', 'run_3'].map((frame) => ({ key: 'hero', frame })),
+      frameRate: 11,
+      repeat: -1,
+    });
     this.scene.start('Title');
   }
 }
