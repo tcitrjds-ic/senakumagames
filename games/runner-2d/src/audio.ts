@@ -173,13 +173,34 @@ class AudioBoxImpl {
 
 export const AudioBox = new AudioBoxImpl();
 
-/** 右上のミュート切替ボタン（全シーン共通の見た目） */
-export function addMuteButton(scene: Phaser.Scene, x: number, y: number): void {
-  const bg = scene.add.circle(x, y, 24, 0xffffff, 0.9).setDepth(60).setStrokeStyle(3, 0xf0b7c8);
-  const icon = scene.add
-    .text(x, y, AudioBox.muted ? '🔇' : '🔊', { fontSize: '22px' })
-    .setOrigin(0.5)
-    .setDepth(61);
+/** 右上のミュート切替ボタン。色はゲームごとの見た目に合わせて変えられる */
+export function addMuteButton(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  look: { fill: number; stroke: number; icon?: number } = { fill: 0xffffff, stroke: 0xf0b7c8 },
+): void {
+  const bg = scene.add.circle(x, y, 24, look.fill, look.fill === 0xffffff ? 0.9 : 1).setDepth(60).setStrokeStyle(3, look.stroke);
+  // アイコン: look.icon（色）があれば線画のスピーカー、なければ絵文字
+  const emoji =
+    look.icon === undefined
+      ? scene.add.text(x, y, '', { fontSize: '22px' }).setOrigin(0.5).setDepth(61)
+      : undefined;
+  const drawn = look.icon === undefined ? undefined : scene.add.graphics().setDepth(61);
+  const render = (muted: boolean): void => {
+    emoji?.setText(muted ? '🔇' : '🔊');
+    if (!drawn || look.icon === undefined) return;
+    drawn.clear().fillStyle(look.icon).lineStyle(2.6, look.icon);
+    drawn.fillRoundedRect(x - 11, y - 4, 6, 8, 1.5); // スピーカー本体
+    drawn.fillTriangle(x - 7, y, x - 1, y - 9, x - 1, y + 9); // コーン
+    if (muted) {
+      drawn.lineBetween(x + 3, y - 5, x + 11, y + 5).lineBetween(x + 11, y - 5, x + 3, y + 5);
+    } else {
+      drawn.beginPath().arc(x, y, 6, -0.9, 0.9).strokePath(); // 音の波
+      drawn.beginPath().arc(x, y, 11, -0.8, 0.8).strokePath();
+    }
+  };
+  render(AudioBox.muted);
   // 見た目は半径24のまま、押せる範囲だけ一回り広げる（スマホで押しやすく）
   bg.setInteractive({
     hitArea: new Phaser.Geom.Circle(24, 24, 34),
@@ -188,8 +209,7 @@ export function addMuteButton(scene: Phaser.Scene, x: number, y: number): void {
   });
   bg.on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
     event.stopPropagation(); // 下のジャンプ入力等を発火させない
-    const muted = AudioBox.toggleMute();
-    icon.setText(muted ? '🔇' : '🔊');
+    render(AudioBox.toggleMute());
     AudioBox.play('click');
   });
 }

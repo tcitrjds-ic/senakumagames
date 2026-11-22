@@ -1,13 +1,8 @@
 import Phaser from 'phaser';
 import { AudioBox, addMuteButton } from '../audio';
-import { FONT, pillButton, addFullscreenButton, addHomeButton } from '../ui';
+import { FONT, pillButton, addFullscreenButton, addHomeButton, setupCamera, softShadow, drawPanel, dimmer } from '../ui';
+import { W, H, P_STORE, C_STORE, BOARD, BOARD_MARGIN, PIT_R, STORE_R, COLOR, pitPos, isStore, seedSpot } from '../layout';
 
-const W = 960;
-const H = 540;
-
-// マス割り: 0-5 あなたのくぼみ / 6 あなたのゴール / 7-12 せなくまのくぼみ / 13 せなくまのゴール
-const P_STORE = 6;
-const C_STORE = 13;
 const SEEDS_PER_PIT = 4;
 
 type Who = 'player' | 'cpu';
@@ -71,11 +66,15 @@ export class GameScene extends Phaser.Scene {
   private pulse = { v: 0 };
   private aiLevel: 0 | 1 | 2 = 1; // よわい / ふつう / つよい
   private cpuMarker?: Phaser.GameObjects.Image;
-  private previewGlow!: Phaser.GameObjects.Image;
+  /** 着地点を示す光の輪（くぼみ用・ゴール用） */
+  private previewRing!: Phaser.GameObjects.Image;
+  private previewStoreRing!: Phaser.GameObjects.Image;
   private previewTag!: Phaser.GameObjects.Text;
+  private previewTagBg!: Phaser.GameObjects.Graphics;
 
   private pitZones: Phaser.GameObjects.Ellipse[] = [];
-  private glows: Phaser.GameObjects.Image[] = [];
+  /** 選べるくぼみのふちを光らせる輪 */
+  private rings: Phaser.GameObjects.Image[] = [];
   private seedLayers: Phaser.GameObjects.Container[] = [];
   private countLabels: Phaser.GameObjects.Text[] = [];
   private avatar!: Phaser.GameObjects.Image;
@@ -86,13 +85,6 @@ export class GameScene extends Phaser.Scene {
 
   constructor() {
     super('Game');
-  }
-
-  private pitPos(i: number): { x: number; y: number } {
-    if (i === P_STORE) return { x: 810, y: 350 };
-    if (i === C_STORE) return { x: 150, y: 350 };
-    if (i <= 5) return { x: 250 + i * 84, y: 435 };
-    return { x: 670 - (i - 7) * 84, y: 265 };
   }
 
   create(): void {
@@ -110,13 +102,20 @@ export class GameScene extends Phaser.Scene {
     this.confirmAction = undefined;
     this.pulse = { v: 0 };
     this.pitZones = [];
-    this.glows = [];
+    this.rings = [];
     this.seedLayers = [];
     this.countLabels = [];
 
-    this.add.image(W / 2, H / 2, 'bg').setDisplaySize(W, H);
-    this.add.image(W / 2, H / 2, 'vignette').setDisplaySize(W, H).setDepth(90).setAlpha(0.8);
-    this.cameras.main.fadeIn(280, 255, 238, 245);
+    setupCamera(this);
+    // テーブル: フェルト → 卓上ライトの明かり（盤のあたりが明るい） → 四隅の落ち込み
+    this.add.tileSprite(W / 2, H / 2, W, H, 'felt').setTileScale(0.5);
+    this.add
+      .image(W / 2, BOARD.y + BOARD.h / 2, 'light')
+      .setDisplaySize(W * 1.15, H * 1.5)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setAlpha(0.2);
+    this.add.image(W / 2, H / 2, 'vignette').setDisplaySize(W, H).setDepth(90).setTint(0x04120d).setAlpha(1);
+    this.cameras.main.fadeIn(320, 12, 33, 27);
     this.buildBoard();
     this.buildHeader();
     this.sparkles = this.add.particles(0, 0, 'sparkle', {
@@ -190,18 +189,19 @@ export class GameScene extends Phaser.Scene {
   }
 
   private buildBoard(): void {
-    // 盤テクスチャ（ステッカー余白ぶんオフセットして重ねる）
-    this.add.image(49, 174, 'board').setOrigin(0, 0).setScale(0.5).setDepth(1);
+    // 盤（画像は板のまわりに落ち影ぶんの余白を持つ）
+    this.add
+      .image(BOARD.x - BOARD_MARGIN, BOARD.y - BOARD_MARGIN, 'board')
+      .setOrigin(0, 0)
+      .setScale(0.5)
+      .setDepth(1);
 
     for (let i = 0; i < 14; i++) {
-      const { x, y } = this.pitPos(i);
-      const isStore = i === P_STORE || i === C_STORE;
-      const rx = isStore ? 44 : 38;
-      const ry = isStore ? 105 : 34;
-      const pit = this.add.ellipse(x, y, rx * 2 + 14, ry * 2 + 14, 0xffffff, 0).setDepth(4);
+      const { x, y } = pitPos(i);
+      const r = isStore(i) ? STORE_R : PIT_R;
+      const pit = this.add.ellipse(x, y, r.x * 2 + 14, r.y * 2 + 14, 0xffffff, 0).setDepth(4);
       if (i <= 5) {
-        const glow = this.add.image(x, y, 'glow').setDepth(2).setAlpha(0).setScale(0.72);
-        this.glows[i] = glow;
+        this.rings[i] = this.addRing(x, y, 'ring_pit', COLOR.gold);
         pit.setInteractive({ useHandCursor: true });
         // 押した瞬間ではなく「離したとき」に決定する。
         // スマホでも 触れる→結果のプレビューを見る→離して決定 / 外へずらしてキャンセル ができる
@@ -225,116 +225,144 @@ export class GameScene extends Phaser.Scene {
       }
       this.pitZones[i] = pit;
       this.seedLayers[i] = this.add.container(x, y).setDepth(5);
-
-      const labelY = isStore ? y + 128 : i <= 5 ? y + 58 : y - 58;
-      this.countLabels[i] = this.add
-        .text(x, labelY, '', {
-          fontFamily: FONT,
-          fontSize: isStore ? '26px' : '20px',
-          fontStyle: 'bold',
-          color: '#7a4a2e',
-        })
-        .setOrigin(0.5)
-        .setStroke('#ffffff', 6)
-        .setDepth(6);
+      this.countLabels[i] = this.addCountBadge(i, x, y);
     }
 
-    this.add
-      .text(150, 218, 'せなくま', { fontFamily: FONT, fontSize: '17px', fontStyle: 'bold', color: '#8a5a44' })
-      .setOrigin(0.5)
-      .setStroke('#ffffff', 5)
-      .setDepth(6);
-    this.add
-      .text(810, 218, 'あなた', { fontFamily: FONT, fontSize: '17px', fontStyle: 'bold', color: '#8a5a44' })
-      .setOrigin(0.5)
-      .setStroke('#ffffff', 5)
-      .setDepth(6);
+    this.addNamePlate(pitPos(C_STORE).x, pitPos(C_STORE).y - STORE_R.y - 19, 'せなくま', COLOR.rose);
+    this.addNamePlate(pitPos(P_STORE).x, pitPos(P_STORE).y - STORE_R.y - 19, 'あなた', COLOR.green);
+    // まく向き（反時計まわり）の矢印は、盤そのものに彫ってある
 
-    // まく方向のガイド（反時計まわり）
-    this.add
-      .text(480, 350, '→ したの列は みぎへ ／ うえの列は ひだりへ ←', {
+    // 手のプレビュー（最後のポテトの着地点と結果を、決める前に見せる）
+    this.previewRing = this.addRing(0, 0, 'ring_pit', COLOR.mint).setVisible(false);
+    this.previewStoreRing = this.addRing(0, 0, 'ring_store', COLOR.mint).setVisible(false);
+    this.previewTagBg = this.add.graphics().setDepth(31).setVisible(false);
+    this.previewTag = this.add
+      .text(0, 0, '', { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#ffffff' })
+      .setOrigin(0.5)
+      .setDepth(32)
+      .setVisible(false);
+  }
+
+  /** くぼみのふちに沿って光る輪。加算合成で、木の上に明かりが乗ったように見せる */
+  private addRing(x: number, y: number, key: 'ring_pit' | 'ring_store', tint: number): Phaser.GameObjects.Image {
+    return this.add
+      .image(x, y, key)
+      .setScale(0.5)
+      .setDepth(3)
+      .setTint(tint)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setAlpha(0);
+  }
+
+  /** 個数を示す象牙色の丸い札。くぼみは外側（自分の列は下、せなくまの列は上）、ゴールは下に置く */
+  private addCountBadge(i: number, x: number, y: number): Phaser.GameObjects.Text {
+    const store = isStore(i);
+    const by = store ? y + STORE_R.y + 19 : i <= 5 ? y + PIT_R.y + 13 : y - PIT_R.y - 13;
+    const r = store ? 15 : 10;
+    const g = this.add.graphics().setDepth(6);
+    g.fillStyle(0x2c1a0c, 0.38).fillCircle(x + 0.8, by + 1.8, r + 0.6);
+    g.fillStyle(COLOR.ivory, 1).fillCircle(x, by, r);
+    g.lineStyle(1.5, COLOR.line, 1).strokeCircle(x, by, r);
+    return this.add
+      .text(x, by, '', {
         fontFamily: FONT,
-        fontSize: '15px',
-        color: '#8a5a44',
+        fontSize: store ? '19px' : '13px',
+        fontStyle: 'bold',
+        color: COLOR.brownText,
       })
       .setOrigin(0.5)
-      .setAlpha(0.55)
-      .setDepth(4);
+      .setDepth(7);
+  }
 
-    // 手のプレビュー（ホバーで最後のポテトの着地点と結果を先に見せる）
-    this.previewGlow = this.add.image(0, 0, 'glow').setDepth(3).setVisible(false).setScale(0.62).setTint(0xa8e6a1);
-    this.previewTag = this.add
-      .text(0, 0, '', { fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#ffffff' })
+  /** ゴールの上に置く名札 */
+  private addNamePlate(x: number, y: number, label: string, color: number): void {
+    const t = this.add
+      .text(x, y, label, { fontFamily: FONT, fontSize: '13px', fontStyle: 'bold', color: '#ffffff' })
       .setOrigin(0.5)
-      .setDepth(31)
-      .setVisible(false);
+      .setDepth(7);
+    const w = t.width + 20;
+    const g = this.add.graphics().setDepth(6);
+    g.fillStyle(0x2c1a0c, 0.35).fillRoundedRect(x - w / 2 + 0.8, y - 10 + 1.8, w, 20, 10);
+    g.fillStyle(color, 1).fillRoundedRect(x - w / 2, y - 10, w, 20, 10);
+    g.lineStyle(1.2, 0xffffff, 0.35).strokeRoundedRect(x - w / 2 + 1.5, y - 8.5, w - 3, 17, 8.5);
   }
 
   private showPreview(i: number): void {
     if (this.busy || this.over || this.confirmAction || this.board[i] === 0) return;
     const r = computeMove(this.board, i, 'player');
     const last = r.path[r.path.length - 1];
-    const pos = this.pitPos(last);
-    this.previewGlow.setPosition(pos.x, pos.y).setVisible(true).setAlpha(0.6);
-    const isStore = last === P_STORE || last === C_STORE;
+    const pos = pitPos(last);
+    const store = isStore(last);
+    (store ? this.previewStoreRing : this.previewRing).setPosition(pos.x, pos.y).setVisible(true).setAlpha(0.95);
+    let label = '';
+    let color: number = COLOR.green;
     if (r.extraTurn) {
-      this.previewTag.setText('もういっかい！').setStroke('#5b8a3c', 7);
+      label = 'もういっかい！';
     } else if (r.captured > 0) {
-      this.previewTag.setText(`よこどり ${r.captured}こ！`).setStroke('#e07a90', 7);
+      label = `よこどり ${r.captured}こ！`;
+      color = COLOR.rose;
     } else {
-      this.previewTag.setVisible(false);
       return;
     }
-    this.previewTag.setPosition(pos.x, pos.y - (isStore ? 128 : 56)).setVisible(true);
+    // 結果の札: くぼみならすぐ上に、ゴールなら名札の位置に重ねて出す
+    const ty = store ? pos.y - STORE_R.y - 19 : pos.y - PIT_R.y - 22;
+    this.previewTag.setText(label).setPosition(pos.x, ty).setVisible(true);
+    const w = this.previewTag.width + 22;
+    this.previewTagBg.clear().setVisible(true);
+    this.previewTagBg.fillStyle(0x06140f, 0.32).fillRoundedRect(pos.x - w / 2 + 1, ty - 13 + 3, w, 26, 13);
+    this.previewTagBg.fillStyle(color, 1).fillRoundedRect(pos.x - w / 2, ty - 13, w, 26, 13);
+    this.previewTagBg.lineStyle(1.5, 0xffffff, 0.5).strokeRoundedRect(pos.x - w / 2 + 1.5, ty - 11.5, w - 3, 23, 11.5);
   }
 
   private hidePreview(): void {
-    this.previewGlow.setVisible(false);
+    this.previewRing.setVisible(false);
+    this.previewStoreRing.setVisible(false);
     this.previewTag.setVisible(false);
+    this.previewTagBg.setVisible(false);
   }
 
   private buildHeader(): void {
     // アバターカード
+    softShadow(this, 20, 20, 158, 158, 4);
     const g = this.add.graphics().setDepth(5);
-    g.fillStyle(0x8a5a44, 0.18).fillRoundedRect(24, 26, 158, 158, 24);
-    g.fillStyle(0xffffff, 0.95).fillRoundedRect(20, 20, 158, 158, 24);
-    g.lineStyle(4, 0xf0b7c8).strokeRoundedRect(20, 20, 158, 158, 24);
+    drawPanel(g, 20, 20, 158, 158, 22);
     this.avatar = this.add.image(99, 88, 'senakuma').setDepth(6);
-    this.avatar.setScale(118 / this.avatar.height);
-    g.fillStyle(0xff8fa8, 1).fillRoundedRect(44, 144, 110, 28, 14);
+    this.fitAvatar();
+    // 名札は切り抜き画像の下端（y=147）にかぶせて、切り口を隠す
+    g.fillStyle(COLOR.rose, 1).fillRoundedRect(44, 143, 110, 28, 14);
+    g.lineStyle(1.2, 0xffffff, 0.4).strokeRoundedRect(45.5, 144.5, 107, 25, 12.5);
     this.add
-      .text(99, 158, 'せなくま', { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#ffffff' })
+      .text(99, 157, 'せなくま', { fontFamily: FONT, fontSize: '15px', fontStyle: 'bold', color: '#ffffff' })
       .setOrigin(0.5)
       .setDepth(6);
 
-    // 吹き出し
+    // 吹き出し（しっぽはアバターのほうへ）
+    softShadow(this, 198, 40, 452, 110, 4);
     const b = this.add.graphics().setDepth(5);
-    b.fillStyle(0x8a5a44, 0.15).fillRoundedRect(202, 46, 452, 110, 20);
-    b.fillStyle(0xffffff, 0.97).fillRoundedRect(198, 40, 452, 110, 20);
-    b.lineStyle(4, 0xf0b7c8).strokeRoundedRect(198, 40, 452, 110, 20);
-    b.fillStyle(0xffffff, 0.97).fillTriangle(198, 86, 198, 116, 176, 100);
-    b.lineStyle(4, 0xf0b7c8).strokeTriangle(199, 86, 199, 116, 176, 100);
-    b.fillStyle(0xffffff, 1).fillRect(198, 86, 6, 30);
+    drawPanel(b, 198, 40, 452, 110, 20);
+    b.fillStyle(COLOR.ivory, 1).fillTriangle(200, 88, 200, 114, 178, 101);
+    b.fillRect(196.4, 89.6, 3.4, 22.8); // しっぽの付け根で枠線を切る
+    b.lineStyle(3, COLOR.line, 1).lineBetween(199.6, 88, 178, 101).lineBetween(178, 101, 199.6, 114);
 
     this.bubbleText = this.add
-      .text(220, 95, '', {
+      .text(222, 95, '', {
         fontFamily: FONT,
         fontSize: '21px',
-        color: '#6b4632',
-        wordWrap: { width: 412, useAdvancedWrap: true },
+        color: COLOR.brownText,
+        wordWrap: { width: 408, useAdvancedWrap: true },
         lineSpacing: 6,
       })
       .setOrigin(0, 0.5)
       .setDepth(6);
 
-    // 手番バナー
+    // 手番の札
     this.turnPill = this.add.graphics().setDepth(6);
     this.turnLabel = this.add
-      .text(790, 82, '', { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: '#ffffff' })
+      .text(790, 82, '', { fontFamily: FONT, fontSize: '21px', fontStyle: 'bold', color: '#ffffff' })
       .setOrigin(0.5)
       .setDepth(7);
 
-    addMuteButton(this, W - 36, 36);
+    addMuteButton(this, W - 36, 36, { fill: COLOR.ivory, stroke: COLOR.line, icon: COLOR.brown });
     addFullscreenButton(this, W - 36, 92);
     addHomeButton(this, W - 36, 148);
   }
@@ -344,9 +372,20 @@ export class GameScene extends Phaser.Scene {
     this.turnLabel.setText(label);
     if (label && color !== undefined) {
       const w = this.turnLabel.width + 44;
-      this.turnPill.fillStyle(0x8a5a44, 0.18).fillRoundedRect(790 - w / 2 + 3, 61 + 4, w, 42, 21);
-      this.turnPill.fillStyle(color, 1).fillRoundedRect(790 - w / 2, 61, w, 42, 21);
+      const x = 790 - w / 2;
+      this.turnPill.fillStyle(0x06140f, 0.3).fillRoundedRect(x + 1, 61 + 4, w, 42, 21);
+      this.turnPill.fillStyle(color, 1).fillRoundedRect(x, 61, w, 42, 21);
+      this.turnPill.fillStyle(0xffffff, 0.16).fillRoundedRect(x + 8, 61 + 4, w - 16, 15, 7.5);
+      this.turnPill.lineStyle(1.5, 0xffffff, 0.45).strokeRoundedRect(x + 2, 63, w - 4, 38, 19);
     }
+  }
+
+  /** アバターをカードの大きさに合わせる。通常絵は元画像の下端に黒い帯が残っているので切り落とす */
+  private fitAvatar(): void {
+    const frame = this.avatar.frame;
+    const trim = this.avatar.texture.key === 'senakuma' ? 9 : 0;
+    this.avatar.setCrop(0, 0, frame.width, frame.height - trim);
+    this.avatar.setScale(118 / frame.height);
   }
 
   private say(text: string): void {
@@ -355,7 +394,7 @@ export class GameScene extends Phaser.Scene {
 
   private setAvatar(key: 'senakuma' | 'senakuma_wink', revertMs = 0): void {
     this.avatar.setTexture(key);
-    this.avatar.setScale(118 / this.avatar.height);
+    this.fitAvatar();
     if (revertMs > 0) {
       this.time.delayedCall(revertMs, () => {
         if (!this.over) this.setAvatar('senakuma');
@@ -367,76 +406,70 @@ export class GameScene extends Phaser.Scene {
     const layer = this.seedLayers[i];
     layer.removeAll(true);
     const n = this.display[i];
-    const isStore = i === P_STORE || i === C_STORE;
-    const shown = Math.min(n, isStore ? 24 : 12);
+    // 見せる石の数には上限を置く（それ以上は山が大きくならないだけで、個数は札の数字で分かる）
+    const shown = Math.min(n, isStore(i) ? 44 : 16);
+    // あとから入った石ほど上に重なる。影は自分の直前に描くので、下の石にも落ちる
     for (let k = 0; k < shown; k++) {
-      // 黄金角で自然にばらけさせる（マスごとに向きを変える）
-      const r = 5 + (isStore ? 13 : 9) * Math.sqrt(k);
-      const a = k * 2.39996 + i * 1.7;
-      const px = Math.cos(a) * r;
-      const py = Math.sin(a) * r * (isStore ? 2.1 : 0.8);
-      layer.add(
-        this.add
-          .image(px, py, 'potato')
-          .setScale(0.17)
-          .setAngle(((k * 47 + i * 31) % 60) - 30),
-      );
+      const s = seedSpot(i, k, shown);
+      layer.add(this.add.image(s.x + 1.6, s.y + 2.6, 'seed_shadow').setScale(0.5));
+      layer.add(this.add.image(s.x, s.y, 'seeds', s.frame).setScale(0.5).setAngle(s.angle));
     }
     this.countLabels[i].setText(String(n));
   }
 
   update(): void {
-    // 選べるくぼみを淡く光らせ、ホバー中は強調する
+    // 選べるくぼみのふちを淡く光らせ、選択中は強く光らせる
     for (let i = 0; i < 6; i++) {
-      const glow = this.glows[i];
-      if (!glow) continue;
-      const clickable = !this.busy && !this.over && this.board[i] > 0;
-      const strong = this.armed === i ? 1 : 0.85; // 押している間はいちばん明るく
-      glow.setAlpha(clickable ? (this.hovered === i ? strong : 0.2 + 0.3 * this.pulse.v) : 0);
+      const ring = this.rings[i];
+      if (!ring) continue;
+      const clickable = !this.busy && !this.over && !this.confirmAction && this.board[i] > 0;
+      const strong = this.armed === i ? 1 : 0.9; // 押している間はいちばん明るく
+      ring.setAlpha(clickable ? (this.hovered === i ? strong : 0.36 + 0.3 * this.pulse.v) : 0);
     }
   }
 
   private showTitleOverlay(): void {
     const items: Phaser.GameObjects.GameObject[] = [];
-    items.push(this.add.rectangle(W / 2, H / 2, W, H, 0x553a2e, 0.62).setDepth(50));
+    items.push(dimmer(this, 0.7, 50));
 
-    const logoShadow = this.add
-      .text(W / 2 + 4, 96, 'せなくまとマンカラ', {
-        fontFamily: FONT, fontSize: '58px', fontStyle: 'bold', color: '#00000033',
-      })
-      .setOrigin(0.5).setDepth(51);
     const logo = this.add
-      .text(W / 2, 92, 'せなくまとマンカラ', {
-        fontFamily: FONT, fontSize: '58px', fontStyle: 'bold', color: '#ffb0c2',
+      .text(W / 2, 88, 'せなくまとマンカラ', {
+        fontFamily: FONT, fontSize: '56px', fontStyle: 'bold', color: '#fff3d2',
       })
-      .setOrigin(0.5).setStroke('#ffffff', 12).setDepth(51);
-    items.push(logo, logoShadow);
+      .setOrigin(0.5).setStroke('#4a2f1c', 12).setShadow(0, 5, '#00000066', 6, true, false).setDepth(51);
+    items.push(logo);
 
+    items.push(softShadow(this, 150, 142, 660, 216, 51));
     const panel = this.add.graphics().setDepth(51);
-    panel.fillStyle(0xfffdf8, 0.97).fillRoundedRect(150, 142, 660, 216, 24);
-    panel.lineStyle(4, 0xf0b7c8).strokeRoundedRect(150, 142, 660, 216, 24);
+    drawPanel(panel, 150, 142, 660, 216, 22);
     items.push(panel);
     const rules = [
-      // 折り返しは空白の位置でだけ起きる。空白が無いと絵文字だけが1行目に取り残される
-      '🍟 じぶんの列（した）のくぼみを えらぶと、ポテトを 反時計まわりに 1つずつ まくよ',
-      '🍟 さいごの1つが みぎのゴールに入ったら もういっかい！',
-      '🍟 さいごの1つが じぶんの空きマスなら、向かいのポテトを横取り！',
-      '🍟 ゴールのポテトが多いほうの勝ち！',
-    ].join('\n\n');
-    items.push(
-      this.add
-        .text(178, 250, rules, {
-          fontFamily: FONT, fontSize: '17px', color: '#6b4632',
-          wordWrap: { width: 604, useAdvancedWrap: true }, lineSpacing: 2,
-        })
-        .setOrigin(0, 0.5).setDepth(52),
-    );
+      'したの列の くぼみを えらぶと、ポテトを 反時計まわりに 1つずつ まく',
+      'さいごの1つが みぎのゴールに 入ったら、もういっかい！',
+      'さいごの1つが じぶんの 空きマスなら、向かいのポテトを よこどり！',
+      'ゴールの ポテトが 多いほうの かち！',
+    ];
+    rules.forEach((line, k) => {
+      const y = 180 + k * 46.5;
+      items.push(this.add.image(190, y + 2.5, 'seed_shadow').setScale(0.5).setDepth(52));
+      items.push(this.add.image(188, y, 'seeds', k % 4).setScale(0.5).setAngle(-20 + k * 35).setDepth(52));
+      items.push(
+        this.add
+          .text(212, y, line, { fontFamily: FONT, fontSize: '17px', color: COLOR.brownText })
+          .setOrigin(0, 0.5).setDepth(52),
+      );
+      if (k < rules.length - 1) {
+        const sep = this.add.graphics().setDepth(52);
+        sep.lineStyle(1, COLOR.lineSoft, 1).lineBetween(176, y + 23, 784, y + 23);
+        items.push(sep);
+      }
+    });
 
     // つよさ選択
     items.push(
       this.add
-        .text(258, 392, 'せなくまの つよさ：', { fontFamily: FONT, fontSize: '19px', fontStyle: 'bold', color: '#ffffff' })
-        .setOrigin(1, 0.5).setStroke('#8a5a44', 6).setDepth(52),
+        .text(258, 392, 'せなくまの つよさ：', { fontFamily: FONT, fontSize: '19px', fontStyle: 'bold', color: COLOR.ivoryText })
+        .setOrigin(1, 0.5).setStroke('#3a2414', 6).setDepth(52),
     );
     const levels: { label: string; v: 0 | 1 | 2 }[] = [
       { label: 'よわい', v: 0 },
@@ -452,12 +485,13 @@ export class GameScene extends Phaser.Scene {
         const selected = this.aiLevel === lv.v;
         const chip = this.add.container(x, 392).setDepth(52);
         const g = this.add.graphics();
-        g.fillStyle(selected ? 0xff8fa8 : 0xffffff, 1).fillRoundedRect(-56, -22, 112, 44, 22);
-        g.lineStyle(3, selected ? 0xe07a90 : 0xe8cdd6).strokeRoundedRect(-56, -22, 112, 44, 22);
+        g.fillStyle(0x06140f, 0.3).fillRoundedRect(-55, -18, 112, 44, 22);
+        g.fillStyle(selected ? COLOR.brown : COLOR.ivory, 1).fillRoundedRect(-56, -22, 112, 44, 22);
+        g.lineStyle(2.5, selected ? 0xe2b04a : COLOR.line).strokeRoundedRect(-56, -22, 112, 44, 22);
         const t = this.add
           .text(0, 0, lv.label, {
             fontFamily: FONT, fontSize: '19px', fontStyle: 'bold',
-            color: selected ? '#ffffff' : '#a97c8c',
+            color: selected ? COLOR.ivoryText : COLOR.brownSoftText,
           })
           .setOrigin(0.5);
         chip.add([g, t]);
@@ -478,9 +512,9 @@ export class GameScene extends Phaser.Scene {
     items.push(
       this.add
         .text(W / 2, 426, 'キーボード：←→ でえらぶ ／ Enter でけってい ／ 1〜6 でちょくせつ えらぶ', {
-          fontFamily: FONT, fontSize: '15px', fontStyle: 'bold', color: '#ffffff',
+          fontFamily: FONT, fontSize: '14px', fontStyle: 'bold', color: COLOR.ivoryText,
         })
-        .setOrigin(0.5).setStroke('#8a5a44', 5).setDepth(52),
+        .setOrigin(0.5).setStroke('#3a2414', 5).setDepth(52),
     );
 
     let begun = false;
@@ -516,7 +550,7 @@ export class GameScene extends Phaser.Scene {
 
   private startPlayerTurn(message: string): void {
     this.busy = false;
-    this.setTurnBanner('あなたのばん！', 0x5b8a3c);
+    this.setTurnBanner('あなたのばん！', COLOR.green);
     this.say(message);
     // マウスや指が乗ったままのくぼみ・キーで選んでいたくぼみは、そのまま次の手のプレビューを出す
     if (this.hovered >= 0 && this.board[this.hovered] > 0) this.showPreview(this.hovered);
@@ -536,9 +570,16 @@ export class GameScene extends Phaser.Scene {
     this.playMove(i, 'player');
   }
 
-  /** ポテト1個が放物線を描いて飛ぶ */
+  /** ポテト1個が持ち上がって運ばれ、置かれる（真上から見ているので、高いほど大きく・影は遠く薄く） */
   private flySeed(from: { x: number; y: number }, to: { x: number; y: number }, onLand: () => void): void {
-    const fly = this.add.image(from.x, from.y, 'potato').setScale(0.2).setDepth(30);
+    const shadow = this.add.image(from.x, from.y, 'seed_shadow').setScale(0.5).setDepth(29);
+    const fly = this.add
+      .image(from.x, from.y, 'seeds', Phaser.Math.Between(0, 3))
+      .setScale(0.5)
+      .setDepth(30)
+      .setAngle(Phaser.Math.Between(0, 359));
+    const spin = Phaser.Math.Between(-90, 90);
+    const startAngle = fly.angle;
     const holder = { t: 0 };
     this.tweens.add({
       targets: holder,
@@ -546,11 +587,16 @@ export class GameScene extends Phaser.Scene {
       duration: 240,
       ease: 'Sine.easeInOut',
       onUpdate: () => {
-        fly.x = from.x + (to.x - from.x) * holder.t;
-        fly.y = from.y + (to.y - from.y) * holder.t - Math.sin(holder.t * Math.PI) * 70;
+        const x = from.x + (to.x - from.x) * holder.t;
+        const y = from.y + (to.y - from.y) * holder.t;
+        const lift = Math.sin(holder.t * Math.PI); // 0=盤の上, 1=いちばん高い
+        fly.setPosition(x - lift * 6, y - lift * 26).setScale(0.5 * (1 + 0.3 * lift));
+        fly.angle = startAngle + spin * holder.t;
+        shadow.setPosition(x + 1.6 + lift * 9, y + 2.6 + lift * 12).setScale(0.5 * (1 + 0.6 * lift)).setAlpha(1 - 0.55 * lift);
       },
       onComplete: () => {
         fly.destroy();
+        shadow.destroy();
         AudioBox.play('tick');
         onLand();
       },
@@ -560,7 +606,7 @@ export class GameScene extends Phaser.Scene {
   /** 1手ぶんのアニメーションと盤面反映、次の手番への引き継ぎ */
   private playMove(pit: number, who: Who): void {
     const result = computeMove(this.board, pit, who);
-    const src = this.pitPos(pit);
+    const src = pitPos(pit);
 
     this.display[pit] = 0;
     this.refreshPit(pit);
@@ -568,7 +614,7 @@ export class GameScene extends Phaser.Scene {
     const stepMs = 150;
     result.path.forEach((target, k) => {
       this.time.delayedCall(stepMs * k, () => {
-        const dst = this.pitPos(target);
+        const dst = pitPos(target);
         this.flySeed(src, dst, () => {
           this.display[target] += 1;
           this.refreshPit(target);
@@ -603,16 +649,16 @@ export class GameScene extends Phaser.Scene {
         AudioBox.play('capture');
         const fromPits = [result.captureFrom!, result.captureTo!];
         for (const p of fromPits) {
-          const pos = this.pitPos(p);
+          const pos = pitPos(p);
           this.sparkles.explode(8, pos.x, pos.y);
         }
         this.display[result.captureFrom!] = 0;
         this.display[result.captureTo!] = 0;
         this.refreshPit(result.captureFrom!);
         this.refreshPit(result.captureTo!);
-        const dst = this.pitPos(ownStore);
+        const dst = pitPos(ownStore);
         for (let k = 0; k < flights; k++) {
-          const from = this.pitPos(fromPits[k % 2]);
+          const from = pitPos(fromPits[k % 2]);
           this.time.delayedCall(k * 60, () =>
             this.flySeed(from, dst, () => {
               this.display[ownStore] += 1;
@@ -663,18 +709,18 @@ export class GameScene extends Phaser.Scene {
   private cpuTurn(): void {
     if (this.over) return;
     this.busy = true;
-    this.setTurnBanner('せなくまのばん…', 0xe07a90);
+    this.setTurnBanner('せなくまのばん…', COLOR.rose);
     this.say('んー、どこにしようかな…');
 
     this.cpuMarker?.destroy();
     this.cpuMarker = undefined;
     this.time.delayedCall(1000, () => {
       const pit = this.chooseCpuMove();
-      const pos = this.pitPos(pit);
-      const marker = this.add.image(pos.x, pos.y, 'glow').setDepth(3).setAlpha(0.9).setScale(0.72);
+      const pos = pitPos(pit);
+      const marker = this.addRing(pos.x, pos.y, 'ring_pit', COLOR.pink).setAlpha(1);
       this.say('ここ！');
       this.time.delayedCall(500, () => {
-        marker.setAlpha(0.35); // どこを選んだか、次の自分の手番まで薄く残す
+        marker.setAlpha(0.45); // どこを選んだか、次の自分の手番まで薄く残す
         this.cpuMarker = marker;
         this.playMove(pit, 'cpu');
       });
@@ -742,8 +788,8 @@ export class GameScene extends Phaser.Scene {
         if (n === 0) continue;
         this.board[store] += n;
         this.board[pit] = 0;
-        const from = this.pitPos(pit);
-        const dst = this.pitPos(store);
+        const from = pitPos(pit);
+        const dst = pitPos(store);
         const flights = Math.min(n, 6);
         this.time.delayedCall(delay, () => {
           this.display[pit] = 0;
@@ -772,13 +818,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   private showResult(p: number, c: number): void {
-    this.add.rectangle(W / 2, H / 2, W, H, 0x553a2e, 0.55).setDepth(50);
+    dimmer(this, 0.62, 50);
+    softShadow(this, W / 2 - 245, H / 2 + 30 - 170, 490, 348, 50.5);
 
     const card = this.add.container(W / 2, H / 2 + 30).setDepth(51);
     const g = this.add.graphics();
-    g.fillStyle(0x8a5a44, 0.35).fillRoundedRect(-250, -162, 500, 352, 30);
-    g.fillStyle(0xfffdf8, 1).fillRoundedRect(-245, -170, 490, 348, 30);
-    g.lineStyle(5, 0xf0b7c8).strokeRoundedRect(-245, -170, 490, 348, 30);
+    drawPanel(g, -245, -170, 490, 348, 28);
     card.add(g);
 
     const playerWon = p > c;
@@ -793,27 +838,28 @@ export class GameScene extends Phaser.Scene {
     card.add(
       this.add
         .text(0, -96, headline, {
-          fontFamily: FONT, fontSize: '46px', fontStyle: 'bold', color: '#8a5a44',
+          fontFamily: FONT, fontSize: '44px', fontStyle: 'bold', color: COLOR.brownText,
         })
         .setOrigin(0.5),
     );
     card.add(
       this.add
         .text(0, -34, `あなた ${p}  ×  ${c} せなくま`, {
-          fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: '#e2504d',
+          fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: '#b8502f',
         })
         .setOrigin(0.5),
     );
     card.add(
       this.add
         .text(0, 20, line, {
-          fontFamily: FONT, fontSize: '20px', color: '#a97c8c',
+          fontFamily: FONT, fontSize: '20px', color: COLOR.brownSoftText,
         })
         .setOrigin(0.5),
     );
 
     const faceKey = playerWon ? 'face_cry' : 'face_laugh';
-    const face = this.add.image(W / 2, H / 2 - 140, faceKey).setDepth(52).setScale(0);
+    // 見出しの文字にかからない高さに置く
+    const face = this.add.image(W / 2, H / 2 - 154, faceKey).setDepth(52).setScale(0);
     this.tweens.add({
       targets: face,
       scale: 130 / face.height,
@@ -840,7 +886,7 @@ export class GameScene extends Phaser.Scene {
     const again = (): void => {
       if (leaving) return; // タップとキーが同時でも1回だけ
       leaving = true;
-      this.cameras.main.fadeOut(240, 255, 238, 245);
+      this.cameras.main.fadeOut(240, 12, 33, 27);
       this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => this.scene.restart());
     };
     pillButton(this, W / 2, H / 2 + 118, 280, 62, 'もういちど！', again);

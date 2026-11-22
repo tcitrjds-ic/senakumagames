@@ -29,7 +29,8 @@
 | `cutout.py` | rembg（`isnet-anime` モデル）で背景除去し、余白トリミングした透過PNGを出力 |
 | `traced_masks.py` + `cut_traced.py` | rembgが使えない環境向けの手動トレース切り抜き（ポリゴン定義と実行） |
 | `make_faces.py` | 顔アップ画像をサムネ風の丸型カットイン（白リング付き）に加工 |
-| `make_game_assets.py` | ゲーム素材一式を生成（白フチステッカー調の小物、空・丘・地面、マンカラの木製盤、パーティクル） |
+| `make_game_assets.py` | せなくまランの素材一式を生成（白フチステッカー調の小物、空・丘・地面、パーティクル） |
+| `make_mancala_assets.py` | マンカラの素材を生成（陰影を計算した木製の盤、ポテト石、フェルト、光る輪、落ち影）。要 `numpy`。`--preview` で確認用画像も出力 |
 | `make_hero_sprite.py` | せなくまランの主人公ドット絵（`hero.png` + `hero.json`）を生成。頭・胴・腕・脚のパーツをコマごとに組み合わせる。`--preview` で確認用画像も出力 |
 | `make_senakuma_sprite.py` | （旧）描き起こしスプライトの生成。実画像切り抜き導入前の暫定版 |
 

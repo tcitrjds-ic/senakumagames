@@ -3,6 +3,15 @@ import '@fontsource/m-plus-rounded-1c/700.css';
 import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
 import { GameScene } from './scenes/GameScene';
+import { W, H, RES } from './layout';
+
+// 文字は RES 倍の解像度で描く（カメラを RES 倍に拡大して映すので、等倍のままだとぼやける）。
+// すべての this.add.text(...) に効かせるため、生成口をここで1か所だけ差し替える。
+const factory = Phaser.GameObjects.GameObjectFactory.prototype;
+const addText = factory.text;
+factory.text = function (x, y, text, style) {
+  return addText.call(this, x, y, text, { resolution: RES, ...style });
+};
 
 let started = false;
 function boot(): void {
@@ -11,9 +20,9 @@ function boot(): void {
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: 'game',
-    width: 960,
-    height: 540,
-    backgroundColor: '#ffeef5',
+    width: W * RES,
+    height: H * RES,
+    backgroundColor: '#1d3f35',
     scale: {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,

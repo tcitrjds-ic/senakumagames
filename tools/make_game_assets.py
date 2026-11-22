@@ -3,7 +3,9 @@
 
 切り抜きキャラの白い縁取りに世界観を合わせ、ポテト・岩などの
 オブジェクトも白フチ＋落ち影付きのステッカー風で統一する。
-背景（空・丘・地面）、パーティクル、マンカラの木製盤もここで生成。
+背景（空・丘・地面）、パーティクルもここで生成。
+マンカラの盤・石・テーブルは tools/make_mancala_assets.py が担当する
+（きらきら・四隅の暗がりだけは両ゲーム共通なので、ここからマンカラにも書き出す）。
 
 使い方:
     pip install Pillow
@@ -76,15 +78,6 @@ def make_sky() -> None:
         (1.0, (253, 240, 244)),
     ]).convert("RGBA")
     save(img, RUNNER / "sky.png")
-
-
-def make_bg_mancala() -> None:
-    img = vgradient(64, 540, [
-        (0.0, (255, 238, 245)),
-        (0.6, (255, 224, 236)),
-        (1.0, (255, 209, 226)),
-    ]).convert("RGBA")
-    save(img, MANCALA / "bg.png")
 
 
 def make_skies_extra() -> None:
@@ -284,7 +277,7 @@ def make_potato() -> None:
     img = _potato((255, 106, 106), (219, 64, 76), (255, 248, 240, 255), (255, 214, 106, 255))
     img = sticker(img, outline=15)
     img = img.resize((128, 128), Image.LANCZOS)
-    save(img, RUNNER / "potato.png", MANCALA / "potato.png")
+    save(img, RUNNER / "potato.png")
 
     # ゴールデンポテト（レア・+5点）
     gold = _potato((255, 214, 92), (222, 158, 40), (255, 252, 238, 255), (226, 80, 90, 255))
@@ -432,67 +425,6 @@ def make_particles() -> None:
     save(img, RUNNER / "dust.png")
 
 
-# ------------------------------------------------------------- マンカラの盤
-
-def pit_inset(img: Image.Image, cx: float, cy: float, rx: float, ry: float) -> None:
-    """くぼみを描く: 縁 → 内側を上(暗)→下(明)の縦グラデで行ごとに塗る"""
-    d = ImageDraw.Draw(img)
-    ellipse(d, cx, cy, rx + 6, ry + 6, (156, 102, 56, 255))  # 縁
-    dark, light = (168, 132, 92), (238, 210, 168)
-    for yy in range(round(cy - ry), round(cy + ry) + 1):
-        dy = (yy - cy) / ry
-        half = rx * math.sqrt(max(0.0, 1 - dy * dy))
-        t = (dy + 1) / 2
-        d.line((cx - half, yy, cx + half, yy), fill=lerp(dark, light, t ** 0.8))
-    # 底の楕円ハイライト（浅い皿感）
-    overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    od = ImageDraw.Draw(overlay)
-    ellipse(od, cx, cy + ry * 0.22, rx * 0.78, ry * 0.62, (255, 240, 210, 60))
-    img.alpha_composite(overlay.filter(ImageFilter.GaussianBlur(6)))
-
-
-def make_board() -> None:
-    W, H = 1640, 620  # ゲーム内 820x310 の2倍
-    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    wood = vgradient(W, H, [(0.0, (226, 173, 114)), (0.55, (206, 146, 88)), (1.0, (188, 126, 72))]).convert("RGBA")
-    mask = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, W - 1, H - 1), radius=56, fill=255)
-    img.paste(wood, (0, 0), mask)
-
-    # 木目と内側の光る枠は透明レイヤーに描いてから合成（確実なアルファブレンド）
-    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    od = ImageDraw.Draw(overlay)
-    for i, (yy, amp, k) in enumerate([(70, 9, 3), (150, 12, 2), (240, 8, 4), (330, 11, 3), (420, 9, 2), (500, 12, 4), (560, 8, 3)]):
-        pts = [(x, yy + amp * math.sin(2 * math.pi * k * x / W + i * 1.3)) for x in range(0, W, 8)]
-        od.line(pts, fill=(126, 78, 40, 46), width=5)
-    od.rounded_rectangle((12, 12, W - 13, H - 13), radius=48, outline=(255, 226, 180, 80), width=6)
-    overlay.putalpha(Image.composite(overlay.getchannel("A"), Image.new("L", (W, H), 0), mask))
-    img.alpha_composite(overlay)
-    d = ImageDraw.Draw(img)
-    d.rounded_rectangle((0, 0, W - 1, H - 1), radius=56, outline=(150, 96, 50, 255), width=10)
-
-    # くぼみ位置（GameScene.pitPos と一致させる: 盤の原点 = ゲーム座標(70,195)）
-    for i in range(6):
-        pit_inset(img, (250 + i * 84 - 70) * 2, (435 - 195) * 2, 76, 68)   # 自分側
-        pit_inset(img, (670 - i * 84 - 70) * 2, (265 - 195) * 2, 76, 68)   # せなくま側
-    pit_inset(img, (810 - 70) * 2, (350 - 195) * 2, 88, 210)               # 自分ゴール
-    pit_inset(img, (150 - 70) * 2, (350 - 195) * 2, 88, 210)               # せなくまゴール
-
-    img = sticker(img, outline=18, shadow=(6, 14), sh_alpha=80)
-    save(img, MANCALA / "board.png")
-
-
-def make_glow() -> None:
-    S = 256
-    img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    for r in range(S // 2, 0, -2):
-        a = round(150 * (1 - r / (S / 2)) ** 1.2)
-        ellipse(d, S / 2, S / 2, r, r * 0.9, (255, 240, 150, a))
-    img = img.resize((160, 160), Image.LANCZOS)
-    save(img, MANCALA / "glow.png")
-
-
 if __name__ == "__main__":
     make_sky()
     make_skies_extra()
@@ -500,7 +432,6 @@ if __name__ == "__main__":
     make_moon()
     make_vignette()
     make_medals()
-    make_bg_mancala()
     make_sun()
     make_hills()
     make_cloud()
@@ -513,5 +444,3 @@ if __name__ == "__main__":
     make_streak()
     make_shadow()
     make_particles()
-    make_board()
-    make_glow()

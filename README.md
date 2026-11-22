@@ -50,11 +50,16 @@ npm run build          # 両ゲームの本番ビルド（games/*/dist/）
 ## テスト
 
 ```bash
-npm test    # ジャンプ入力と障害物の出現間隔のロジックを検証（Node 22.18 以降）
+npm test    # ジャンプ入力・障害物の出現間隔・マンカラの石の配置を検証（Node 22.18 以降）
 ```
 
 ジャンプの手ざわり（高さ・先行入力の長さなど）は `games/runner-2d/src/constants.ts` の
 `JUMP_TUNING`、障害物どうしの最低間隔は `games/runner-2d/src/spawn.ts` で調整できます。
+
+マンカラの盤は、板の「高さ」を作ってから左上の光で陰影を計算して描いています
+（`tools/make_mancala_assets.py`）。くぼみの位置や大きさを変えるときは、このツールの `LAYOUT` と
+`games/mancala/src/layout.ts` の両方を同じ値にしてください（`npm test` が一致を確認します）。
+高精細な画面では2倍の解像度で描画します（`layout.ts` の `RES`。起動時に画面から自動で決定）。
 
 ## 公開（GitHub Pages）
 
@@ -78,6 +83,7 @@ npm test    # ジャンプ入力と障害物の出現間隔のロジックを検
 | せなくまラン | `hero.png` + `hero.json` | 主人公のドット絵（正面顔・9コマ: 立ち/まばたき/走り4コマ/ジャンプ/落下/ミス） | `python3 tools/make_hero_sprite.py`（ビーズ作品 `assets/raw/senakuma_beads_reference.png` を見本に描き起こし） |
 | せなくまラン・マンカラ | `face_cry.png` / `face_laugh.png` | 丸型カットイン（泣き顔・笑い顔） | TotK実況サムネから `tools/make_faces.py` |
 | マンカラ | `player.png` / `player_jump.png` | せなくまのアバター（通常・ウインク） | サムネイルからの切り抜き（`tools/traced_masks.py` + `tools/cut_traced.py`） |
+| マンカラ | `board.png` / `seeds.png` / `felt.png` ほか | 木製の盤・ポテト石・フェルトのテーブル・光る輪 | `python3 tools/make_mancala_assets.py`（要 `numpy`） |
 
 主人公のドット絵を直すときは `tools/make_hero_sprite.py` の文字グリッド（頭・胴・腕・脚の
 パーツと、コマごとの組み合わせ）を編集して実行し直します。`--preview out.png` で全コマを

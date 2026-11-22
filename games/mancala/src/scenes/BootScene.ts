@@ -1,35 +1,41 @@
 import Phaser from 'phaser';
+import { W, H, COLOR } from '../layout';
+import { FONT, setupCamera } from '../ui';
 
-const FONT = '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Yu Gothic UI", system-ui, sans-serif';
-
+/** アセット読み込みシーン。盤まわりの素材は tools/make_mancala_assets.py が生成する */
 export class BootScene extends Phaser.Scene {
   constructor() {
     super('Boot');
   }
 
   preload(): void {
-    this.cameras.main.setBackgroundColor('#ffeef5');
+    setupCamera(this);
+    this.cameras.main.setBackgroundColor('#1d3f35');
     this.add
-      .text(480, 240, 'よみこみちゅう…', {
+      .text(W / 2, H / 2 - 30, 'よみこみちゅう…', {
         fontFamily: FONT,
-        fontSize: '28px',
-        color: '#c06a7a',
+        fontSize: '26px',
+        color: COLOR.ivoryText,
       })
       .setOrigin(0.5);
     const barBg = this.add.graphics();
-    barBg.fillStyle(0xffffff, 1).fillRoundedRect(300, 278, 360, 22, 11);
+    barBg.fillStyle(0x0c211b, 0.6).fillRoundedRect(W / 2 - 180, H / 2 + 8, 360, 20, 10);
     const bar = this.add.graphics();
     this.load.on('progress', (v: number) => {
       bar.clear();
-      bar.fillStyle(0xf299ae, 1).fillRoundedRect(306, 282, 348 * v, 14, 7);
+      bar.fillStyle(0xe2b04a, 1).fillRoundedRect(W / 2 - 176, H / 2 + 12, 352 * v, 12, 6);
     });
 
-    this.load.image('bg', 'assets/bg.png');
+    this.load.image('felt', 'assets/felt.png');
+    this.load.image('light', 'assets/light.png');
     this.load.image('vignette', 'assets/vignette.png');
     this.load.image('board', 'assets/board.png');
-    this.load.image('glow', 'assets/glow.png');
+    this.load.spritesheet('seeds', 'assets/seeds.png', { frameWidth: 52, frameHeight: 52 });
+    this.load.image('seed_shadow', 'assets/seed_shadow.png');
+    this.load.image('ring_pit', 'assets/ring_pit.png');
+    this.load.image('ring_store', 'assets/ring_store.png');
+    this.load.image('panel_shadow', 'assets/panel_shadow.png');
     this.load.image('sparkle', 'assets/sparkle.png');
-    this.load.image('potato', 'assets/potato.png');
     this.load.image('senakuma', 'assets/player.png');
     this.load.image('senakuma_wink', 'assets/player_jump.png');
     this.load.image('face_cry', 'assets/face_cry.png');
