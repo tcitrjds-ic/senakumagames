@@ -2,13 +2,13 @@
 """せなくま美術館の歩行キャラのドット絵スプライトシートを生成する。
 
 各キャラを「正面・背面・横（右向き）」の3行 × 「立ち・歩きA・歩きB」の3列 = 9コマの
-シートとして出力する（1マス=1px。ゲーム側で NEAREST 拡大）。セルは既定 24×32 マス
-（シート 72×96 px）で、キャラごとに "cell" で上書きできる（せなくまは 32×44 マス →
-シート 96×132 px）。横向きの左向きはゲーム側で左右反転。
+シートとして出力する（1マス=1px。ゲーム側で NEAREST 拡大）。住人のセルは 24×32 マス
+（シート 72×96 px）。せなくまは せなくまランの主人公と同じ絵を使い、26×33 マス
+（シート 78×99 px）。横向きの左向きはゲーム側で左右反転。
 歩きコマは立ち絵から足の動きを機械生成する（正面・背面は片足を1行持ち上げ、横は前後の足を
 開く／後ろ足を上げる。足のないキャラは legs_from=0 にすると裾を左右に揺らす）。
 
-キャラ: せなくま（主人公・アイロンビーズ作品の意匠を踏襲: クマ耳・金髪ボブ・赤いワンピース）、
+キャラ: せなくま（主人公。せなくまランと同じ、公式ビーズ作品を見本にした二頭身）、
         ポテトくん・くまの学芸員・うさぎの絵かき・ひよこ（館内を歩く住人。すべてオリジナル）
 
 使い方:
@@ -21,6 +21,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from PIL import Image
+
+import make_hero_sprite as hero
 
 OUT = Path(__file__).resolve().parents[1] / "games" / "gallery" / "public" / "assets"
 CW, CH = 24, 32  # 既定のセル（キャラごとに "cell" で上書き可）
@@ -42,160 +44,116 @@ BASE = {
 # 立ち絵の定義: (正面, 背面, 横) の3枚。行数は自由（セル内で下揃え・中央揃え）
 CHARS: dict[str, dict] = {}
 
-# ---------------------------------------------------------------- せなくま
-# 実イラスト（サムネイルの切り抜き assets/sprites/senakuma_normal.png）に忠実に:
-#   金髪ロング（肩下まで）・ぱっつん前髪・頭頂に白いツヤのハイライト・こげ茶の丸いクマ耳
-#   大きな茶色の瞳（白いハイライト＋上下のまつ毛）・丸いピンクのほほ・小さな笑った口
-#   白い丸襟（フリル）の赤い服。他キャラより細かい 32×44 マスで描く
-CHARS["senakuma"] = {
-    "cell": (32, 44),
-    "pal": {**BASE,
-            "E": (122, 80, 48, 255), "e": (162, 112, 68, 255),
-            "H": (241, 205, 112, 255), "h": (216, 172, 86, 255), "k": (170, 120, 58, 255), "L": (253, 249, 238, 255),
-            "S": (254, 238, 226, 255), "s": (243, 210, 192, 255),
-            "Y": (74, 40, 28, 255), "y": (146, 76, 52, 255), "W": (255, 255, 255, 255),
-            "P": (250, 160, 172, 255), "M": (200, 84, 92, 255),
-            "R": (208, 50, 54, 255), "r": (164, 32, 40, 255), "C": (251, 248, 241, 255), "c": (222, 215, 202, 255)},
+# ================================================================ せなくま（主人公）
+# せなくまランの主人公と同じ絵（公式のビーズ作品を見本にした二頭身）を使う。
+# 正面はランナーの絵そのもの（tools/make_hero_sprite.py の頭・胴・腕・脚）で、
+# ここでは美術館で必要な「背中」と「ななめ横（進む向きに顔を向けた姿）」だけを描き足す。
+# 絵を2か所に持たないので、ランナー側を直せば美術館の正面も同じに直る。
+
+# 背中: 頭の後ろは髪だけ。長い髪が背中まで下りる（頭の上12行は正面と同じ）
+SENAKUMA_HEAD_BACK = hero.HEAD[:12] + [
+    "KHHHHHHHHHHHHHHHHHHHHK",
+    "KHHHHhHHHHHHHHHHhHHHHK",
+    "KHHHHhHHHHHHHHHHhHHHHK",
+    "KHHHHhHHHHHHHHHHhHHHHK",
+    "KHHHHhHHHHHHHHHHhHHHHK",
+    "KHHHHhHHHHHHHHHHhHHHHK",
+    "KHHHHhHHHHHHHHHHhHHHHK",
+    ".KHHHhHHHHHHHHHHhHHHK.",
+    ".KHHHhHHHHHHHHHHhHHHK.",
+    ".KHHHHHHHHHHHHHHHHHHK.",
+    "..KKHHHHHHHHHHHHHHKK..",
+    "....KKKKKKKKKKKKKK....",
+]
+SENAKUMA_BODY_BACK = [
+    ".KRRRRRRRRK.",
+    ".KRRRRRRRRK.",
+] + hero.BODY[2:]
+
+# ななめ横（右向き）: 顔を進む向きへ寄せ、手前の横髪は後ろへ流れる。目は2つとも見える
+SENAKUMA_HEAD_SIDE = hero.HEAD[:12] + [
+    "KHHHHHHHHHHSSHHHSSSHHK",
+    "KHLHHHHHHHSSSSHSSSSSHK",
+    "KHLHHHHHHSSSSSSSSSSSSK",
+    "KHHHHHHHHSSSSSSSSSSSSK",
+    "KHHHHHHHHSSSSSSSSSSSK.",
+    ".KHHHHHHKSSSSSSSSSSK..",
+    ".KHHHHHHHKKSSSSSSKK...",
+    ".KHHHHHK...KKKKKK.....",
+]
+SENAKUMA_LOCKS_SIDE = [
+    ".KHHHHK...............",
+    ".KHHHHK...............",
+    "..KKKK................",
+]
+SENAKUMA_FACE_SIDE = [(13, 14, ["K", "K"]), (18, 14, ["K", "K"]), (15, 16, ["PP"])]
+SIDE_SHIFT = 2  # ななめ横では、体を顔の向きへ2マス寄せる
+
+_L, _LU, _LK = hero.LEG, hero.LEG_UP, hero.LEG_KICK
+SENAKUMA_POSES = {
+    # 正面・背中: 片足ずつ持ち上げて とことこ歩く（持ち上げたとき体が1マス上がる）
     "front": [
-        "........KKKK........KKKK........",
-        ".......KEEEEK......KEEEEK.......",
-        "......KEeeeEEK....KEEeeeEK......",
-        "......KEeeeEEKKKKKKEEeeeEK......",
-        "......KEEEEKHHHHHHHHKEEEEK......",
-        ".....KEEEKHHHHLLLLLHHHHKEEEK....",
-        "....KKKKHHHHLLHHHHLLLHHHHKKKK...",
-        "...KHHHHHHHLHHHHHHHHHLLHHHHHK...",
-        "...KHHHHHHHHHHHHHHHHHHHLHHHHK...",
-        "..KHHHHHHHHHHHHHHHHHHHHHHHHHHK..",
-        "..KHHHHHHHHHHHHHHHHHHHHHHHHHHK..",
-        "..KHHHHHHHHHHHHHHHHHHHHHHHHHHK..",
-        "..KHHHHhHHHhHHHHhHHHHhHHhHHHHK..",
-        "..KHHHHhHHHhHHHHhHHHHhHHhHHHHK..",
-        "..KHHHHkHHHkHHHHkHHHHkHHkHHHHK..",
-        "..KHHHKkSSSkSSSSkSSSSkSSkKHHHK..",
-        "..KHHHKSSSSSSSSSSSSSSSSSSKHHHK..",
-        "..KHHHKSSKKKKSSSSSSKKKKSSKHHHK..",
-        "..KHHHKSKYWYYKSSSSKYYWYKSKHHHK..",
-        "..KHHHKSKYYyyKSSSSKyyYYKSKHHHK..",
-        "..KHHHKSKyyWyKSSSSKyWyyKSKHHHK..",
-        "..KHHHKSSKKKKSSSSSSKKKKSSKHHHK..",
-        "..KHHHKSPPSSSSSSSSSSSSPPSKHHHK..",
-        "..KHHHKSPPSSSSMSSMSSSSPPSKHHHK..",
-        "..KHHHKSSSSSSSSMMSSSSSSSSKHHHK..",
-        "..KHHHKsSSSSSSSSSSSSSSSSsKHHHK..",
-        "..KHHHHKKsSSSSSSSSSSSSsKKHHHHK..",
-        "..KHHHHHKKKSSSSSSSSSSKKKHHHHHK..",
-        "..KHHHHHHHKKSSSSSSSSKKHHHHHHHK..",
-        "..KHHHHHHKCCCCCCCCCCCCKHHHHHHK..",
-        "..KHHHHHKCCCcKRRRRKcCCCKHHHHHK..",
-        "...KHHHHKKcKRRRRRRRRKcKKHHHHK...",
-        "...KHHHKRRKRRRRRRRRRRKRRKHHHK...",
-        "....KHHKRRKRRRRRRRRRRKRRKHHK....",
-        ".....KKKRRKRRRRRRRRRRKRRKKK.....",
-        ".......KrRKRRRRRRRRRRKRrK.......",
-        ".......KSSKRRRRRRRRRRKSSK.......",
-        ".......KSSKRRRRRRRRRRKSSK.......",
-        "........KKKRRRRRRRRRRKKK........",
-        "..........KRRRRRRRRRRK..........",
-        "..........KrrrrrrrrrrK..........",
-        "...........KSSK..KSSK...........",
-        "...........KBBK..KBBK...........",
-        "...........KKKK..KKKK...........",
+        dict(dy=0, arms=hero.ARMS_DOWN, legs=[(_L, 6, 28), (_L, 12, 28)]),
+        dict(dy=-1, arms=hero.ARMS_DOWN, legs=[(_LU, 6, 28), (_L, 12, 28)]),
+        dict(dy=-1, arms=hero.ARMS_DOWN, legs=[(_L, 6, 28), (_LU, 12, 28)]),
     ],
-    "back": [
-        "........KKKK........KKKK........",
-        ".......KEEEEK......KEEEEK.......",
-        "......KEEEEEEK....KEEEEEEK......",
-        "......KEEEEEEKKKKKKEEEEEEK......",
-        "......KEEEEKHHHHHHHHKEEEEK......",
-        ".....KEEEKHHHHLLLLLHHHHKEEEK....",
-        "....KKKKHHHHLLHHHHLLLHHHHKKKK...",
-        "...KHHHHHHHLHHHHHHHHHLLHHHHHK...",
-        "...KHHHHHHHHHHHHHHHHHHHLHHHHK...",
-        "..KHHHHHHHHHHHHHHHHHHHHHHHHHHK..",
-        "..KHHHHHHHHHHHHHHHHHHHHHHHHHHK..",
-        "..KHHHHHHHHHHHHHHHHHHHHHHHHHHK..",
-        "..KHHHHHHHHHHHHHHHHHHHHHHHHHHK..",
-        "..KHHHHHHHHHHHHHHHHHHHHHHHHHHK..",
-        "..KHHHHHHHhHHHHHHHHHHhHHHHHHHK..",
-        "..KHHHHHHHhHHHHHHHHHHhHHHHHHHK..",
-        "..KHHHHHHHhHHHHHHHHHHhHHHHHHHK..",
-        "..KHHHHHHHhHHHHHHHHHHhHHHHHHHK..",
-        "..KHHHHHHHhHHHHHHHHHHhHHHHHHHK..",
-        "..KHHHHHHHhHHHHHHHHHHhHHHHHHHK..",
-        "..KHHHHHHHhHHHHHHHHHHhHHHHHHHK..",
-        "..KHHHHHHHhHHHHHHHHHHhHHHHHHHK..",
-        "..KHHHHHHHhHHHHHHHHHHhHHHHHHHK..",
-        "..KHHHHHHHhHHHHHHHHHHhHHHHHHHK..",
-        "..KHHHHHHHhHHHHHHHHHHhHHHHHHHK..",
-        "..KHHHHHHHhHHHHHHHHHHhHHHHHHHK..",
-        "..KHHHHHHHhHHHHHHHHHHhHHHHHHHK..",
-        "..KHHHHHHHhHHHHHHHHHHhHHHHHHHK..",
-        "..KHHHHHHHhHHHHHHHHHHhHHHHHHHK..",
-        "..KHHHHHHHhHHHHHHHHHHhHHHHHHHK..",
-        "..KHHHHHHHhHHHHHHHHHHhHHHHHHHK..",
-        "...KHHHHHHHHHHHHHHHHHHHHHHHHK...",
-        "...KHHHKRRKHHHHHHHHHHKRRKHHHK...",
-        "....KHHKRRKHHHHHHHHHHKRRKHHK....",
-        ".....KKKRRKHHHHHHHHHHKRRKKK.....",
-        ".......KrRKhhhhhhhhhhKRrK.......",
-        ".......KSSKRRRRRRRRRRKSSK.......",
-        ".......KSSKRRRRRRRRRRKSSK.......",
-        "........KKKRRRRRRRRRRKKK........",
-        "..........KRRRRRRRRRRK..........",
-        "..........KrrrrrrrrrrK..........",
-        "...........KSSK..KSSK...........",
-        "...........KBBK..KBBK...........",
-        "...........KKKK..KKKK...........",
-    ],
+    # ななめ横: ランナーの走りと同じ足運び（後ろ足を蹴り上げる → 反対の足）と腕ふり
     "side": [
-        ".......KKKK...........KKKK......",
-        "......KEEEEK.........KEEEEK.....",
-        ".....KEeeeEEK.......KEeeeEK.....",
-        ".....KEeeeEEKKKKKKKKKEeeeEK.....",
-        ".....KEEEEKHHHHHHHHHHKEEEEK.....",
-        "....KEEEKHHHHHLLLLLHHHHKEEK.....",
-        "....KKKKHHHHHLLHHHHLLLHHHKKK....",
-        "...KHHHHHHHHHLHHHHHHHHLLHHHHK...",
-        "...KHHHHHHHHHHHHHHHHHHHHLHHHHK..",
-        "..KHHHHHHHHHHHHHHHHHHHHHHHHHHK..",
-        "..KHHHHHHHHHHHHHHHHHHHHHHHHHHK..",
-        "..KHHHHHHHHHHHHHHHHHHHHHHHHHHK..",
-        "..KHHHHHHHHHHHHHHHHhHHHHhHHHHK..",
-        "..KHHHHHHHHHHHHHHHHhHHHHhHHHHK..",
-        "..KHHHHHHHHHHHHHHHHkHHHHkHHHHK..",
-        "..KHHHHHHHHHHHHHHHKkSSSkSSSSkK..",
-        "..KHHHHHHHHHHHHHHHKSSSSSSSSSSK..",
-        "..KHHHHHHHHHHHHHHHKSSSSSKKKKSK..",
-        "..KHHHHHHHHHHHHHHHKSSSKYWYYKSK..",
-        "..KHHHHHHHHHHHHHHHKSSSKYYyyKSK..",
-        "..KHHHHHHHHHHHHHHHKSSSKyyWyKSK..",
-        "..KHHHHHHHHHHHHHHHKSSSSKKKKSSK..",
-        "..KHHHHHHHHHHHHHHHKSSSSSSSPPSK..",
-        "..KHHHHHHHHHHHHHHHKSSSSSSMPPSK..",
-        "..KHHHHHHHHHHHHHHHKSSSSSSSMSSK..",
-        "..KHHHHHHHHHHHHHHHKsSSSSSSSSsK..",
-        "..KHHHHHHHHHHHHHHHKKsSSSSSSsK...",
-        "...KHHHHHHHHHHHHHHKKKSSSSSSKK...",
-        "...KHHHHHHHHHHHHHHHKKKSSSSKK....",
-        "...KHHHHHHHHHHHHHHHHKCCCCCCK....",
-        "....KHHHHHHHHHHHHHHKCCcRRRcK....",
-        "....KHHHHHHHHHHHHHKKcRRRRRcK....",
-        ".....KHHHHHHHHHHHHKRRRRRRRK.....",
-        "......KHHHHHHHHHHKKRRRKRRRK.....",
-        ".......KKKKKKKKKKKKRRRKRrRK.....",
-        "..................KRRRKSSRK.....",
-        "..................KRRRKSSRK.....",
-        "..................KRRRRKKRK.....",
-        "..................KRRRRRRRK.....",
-        "..................KRRRRRRRK.....",
-        "..................KrrrrrrrK.....",
-        "..................KSSK.KSSK.....",
-        "..................KBBK.KBBK.....",
-        "..................KKKK.KKKK.....",
+        dict(dy=0, arms=hero.ARMS_DOWN, legs=[(_L, 6, 28), (_L, 12, 28)]),
+        dict(dy=0, arms=[(hero.ARM_FWD_L, 4, 21), (hero.ARM_BACK_R, 15, 21)], legs=[(_LK, 3, 27), (_L, 12, 28)]),
+        dict(dy=-1, arms=[(hero.ARM_BACK_L, 3, 21), (hero.ARM_FWD_R, 14, 21)], legs=[(_LU, 4, 28), (_L, 12, 28)]),
     ],
-    "legs_from": -3,
 }
+SENAKUMA_POSES["back"] = SENAKUMA_POSES["front"]
+
+
+def senakuma_cell(view: str, pose: dict) -> Image.Image:
+    """せなくまの1コマ（hero.CW x hero.FOOT_ROW マス。足の裏がコマの下端にくる）"""
+    img = Image.new("RGBA", (hero.CW, hero.CH), (0, 0, 0, 0))
+    px = img.load()
+    bx = SIDE_SHIFT if view == "side" else 0
+    ox, oy = hero.HEAD_X, hero.HEAD_Y + pose["dy"]
+    # 脚は上下させない（地面に着いた足はそのまま、体だけが弾む）
+    for part, x, y in pose["legs"]:
+        hero.stamp(px, part, hero.HEAD_X + x + bx, hero.HEAD_Y + y)
+    if view == "back":
+        hero.stamp(px, SENAKUMA_BODY_BACK, ox + 5, oy + 20)
+        for part, x, y in pose["arms"]:
+            hero.stamp(px, part, ox + x, oy + y)
+        hero.stamp(px, SENAKUMA_HEAD_BACK, ox, oy)  # 髪がいちばん手前（背中にかかる）
+    else:
+        hero.stamp(px, hero.BODY, ox + 5 + bx, oy + 20)
+        if view == "side":
+            hero.stamp(px, SENAKUMA_HEAD_SIDE, ox, oy)
+            hero.stamp(px, SENAKUMA_LOCKS_SIDE, ox, oy + 20)
+            face = SENAKUMA_FACE_SIDE
+        else:
+            hero.stamp(px, hero.HEAD, ox, oy)
+            hero.stamp(px, hero.LOCKS["rest"], ox, oy + 20)
+            face = hero.FACES["open"]
+        for x, y, rows in face:
+            hero.stamp(px, rows, ox + x, oy + y)
+        for part, x, y in pose["arms"]:
+            hero.stamp(px, part, ox + x + bx, oy + y)
+    return img.crop((0, 0, hero.CW, hero.FOOT_ROW))
+
+
+def render_senakuma() -> None:
+    cw, ch = hero.CW, hero.FOOT_ROW
+    sheet = Image.new("RGBA", (cw * 3, ch * 3), (0, 0, 0, 0))
+    for row, view in enumerate(("front", "back", "side")):
+        for col, pose in enumerate(SENAKUMA_POSES[view]):
+            sheet.paste(senakuma_cell(view, pose), (col * cw, row * ch))
+    OUT.mkdir(parents=True, exist_ok=True)
+    sheet.save(OUT / "char_senakuma.png")
+    print(f"wrote {OUT / 'char_senakuma.png'} ({sheet.width}x{sheet.height})")
+    # タイトル画面用に、正面の立ち絵を大きく書き出す
+    front = sheet.crop((0, 0, cw, ch))
+    bbox = front.getbbox()
+    front = front.crop(bbox).resize(((bbox[2] - bbox[0]) * 8, (bbox[3] - bbox[1]) * 8), Image.NEAREST)
+    front.save(OUT / "senakuma_front.png")
+    print(f"wrote {OUT / 'senakuma_front.png'} ({front.width}x{front.height})")
+
 
 # ================================================================ 美術館の住人（すべてオリジナル）
 # せなくまチャンネルのモチーフ（ポテト・クマ）から作った、この美術館だけのキャラクター。
@@ -510,8 +468,6 @@ CHARS["chick"] = {
 def check_grids() -> None:
     """住人の絵は全行 20 マス幅にそろえる（ずれると輪郭が欠ける）"""
     for name, spec in CHARS.items():
-        if name == "senakuma":
-            continue
         for view in ("front", "back", "side"):
             for y, row in enumerate(spec[view]):
                 if len(row) != 20:
@@ -622,18 +578,11 @@ def render(name: str, spec) -> None:
     p = OUT / f"char_{name}.png"
     sheet.save(p)
     print(f"wrote {p} ({sheet.width}x{sheet.height})")
-    if name == "senakuma":
-        # タイトル画面用に正面立ち絵を大きく書き出す
-        front = sheet.crop((0, 0, CW, CH))
-        bbox = front.getbbox()
-        front = front.crop(bbox).resize(((bbox[2] - bbox[0]) * 8, (bbox[3] - bbox[1]) * 8), Image.NEAREST)
-        front.save(OUT / "senakuma_front.png")
-        print(f"wrote {OUT / 'senakuma_front.png'} ({front.width}x{front.height})")
 
 
 def contact_sheet(path: Path) -> None:
     """確認用: 全キャラのシートを8倍で並べる"""
-    names = list(CHARS)
+    names = ["senakuma"] + list(CHARS)
     imgs = [Image.open(OUT / f"char_{n}.png") for n in names]
     k = 8
     sheet = Image.new("RGBA", (sum(i.width * k + 16 for i in imgs), max(i.height for i in imgs) * k), (90, 120, 160, 255))
@@ -647,6 +596,7 @@ def contact_sheet(path: Path) -> None:
 if __name__ == "__main__":
     import sys
     check_grids()
+    render_senakuma()
     for name, spec in CHARS.items():
         render(name, spec)
     if len(sys.argv) > 1:

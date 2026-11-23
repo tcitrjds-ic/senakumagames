@@ -4,6 +4,7 @@ import '@fontsource/m-plus-rounded-1c/800.css';
 import * as THREE from 'three';
 import { AudioBox } from './audio';
 import { buildHall, ROOM, STATUE, PARTITION } from './hall';
+import { InputBasis, followYaw } from './follow';
 import { Controls } from './controls';
 import { normalizeManifest, type Painting, type RawManifest } from './manifest';
 import { HungPainting, placeholderTexture } from './painting';
@@ -153,20 +154,9 @@ async function main(): Promise<void> {
   const CAM_DIST = 6.2;
   const CAM_H = 3.0;
   const updateCamera = (dt: number, moveDir: THREE.Vector3 | null, sinceOrbit: number, snap = false) => {
-    // 進行方向がカメラの前方（画面奥）に近いときだけ、後ろへゆっくり回り込む。
-    // 横移動で回すと入力方向が回転して螺旋になるので回さない。
-    if (moveDir && sinceOrbit > 2.5) {
-      const fx = -Math.sin(camYaw);
-      const fz = -Math.cos(camYaw);
-      const len = Math.hypot(moveDir.x, moveDir.z) || 1;
-      const dot = (moveDir.x * fx + moveDir.z * fz) / len;
-      if (dot > 0.6) {
-        const want = Math.atan2(moveDir.x, moveDir.z) + Math.PI;
-        let diff = want - camYaw;
-        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-        camYaw += diff * Math.min(1, dt * 1.0);
-      }
-    }
+    // 歩いている向きの後ろへ回り込む（前進・横・斜めのどれでも。詳細は follow.ts）。
+    // 手でカメラを回した直後は、その向きを尊重してしばらく回さない。
+    if (moveDir && sinceOrbit > 1.5) camYaw = followYaw(camYaw, moveDir.x, moveDir.z, dt);
     camTarget.set(player.pos.x, player.pos.y + 1.4, player.pos.z);
     // 目標位置へのレイが壁・床・天井に当たる手前までカメラを寄せる
     const dir = new THREE.Vector3(Math.sin(camYaw) * CAM_DIST, CAM_H - 1.4, Math.cos(camYaw) * CAM_DIST);
@@ -230,12 +220,11 @@ async function main(): Promise<void> {
   });
 
   // デバッグ用（E2Eテストが位置やフレームレートを読む）
-  const dbg = { frames: 0, pos: player.pos, npcs, camYaw: () => camYaw, started: () => started, grounded: () => (player as unknown as { grounded: boolean }).grounded };
+  const dbg = { frames: 0, pos: player.pos, facing: player.facing, sprite: player.pixel, npcs, camYaw: () => camYaw, started: () => started, grounded: () => (player as unknown as { grounded: boolean }).grounded };
   (window as unknown as { __gallery: typeof dbg }).__gallery = dbg;
 
   // ---- メインループ ----
-  const fwd = new THREE.Vector3();
-  const rightV = new THREE.Vector3();
+  const basis = new InputBasis();
   const move = new THREE.Vector3();
   const camFwd = new THREE.Vector3(0, 0, -1);
   let nearest: HungPainting | null = null;
@@ -247,10 +236,9 @@ async function main(): Promise<void> {
 
     if (started && !viewer.isOpen) {
       camYaw += input.orbitDelta;
-      // カメラ基準の前・右
-      fwd.set(-Math.sin(camYaw), 0, -Math.cos(camYaw));
-      rightV.set(Math.cos(camYaw), 0, -Math.sin(camYaw));
-      move.set(0, 0, 0).addScaledVector(fwd, input.stickY).addScaledVector(rightV, input.stickX);
+      // 入力をカメラから見た向きで解釈する（同じ向きに押し続ける間は基準を固定。follow.ts）
+      const m = basis.resolve(input.stickX, input.stickY, camYaw, input.orbitDelta !== 0);
+      move.set(m.x, 0, m.z);
       const moving = move.lengthSq() > 0.0025;
       player.update(dt, { mx: move.x, mz: move.z, jump: input.jumpPressed });
       updateCamera(dt, moving ? move : null, input.sinceOrbit);
