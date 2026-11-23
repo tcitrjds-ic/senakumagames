@@ -78,6 +78,14 @@ npm test    # ジャンプ入力・障害物の出現間隔・マンカラの石
 
 公開URL: `https://<ユーザー名>.github.io/senakumagames/`
 
+公開のしかたと確認:
+
+- 公開できるのは既定ブランチ（`claude/senakuma-game-plan-zua73h`）からだけです（GitHub の
+  Environments → github-pages の設定）。`main` への push では公開は拒否されます。
+  既定ブランチを更新したあと、**Actions → Deploy to GitHub Pages → Run workflow** で実行します。
+- 公開したら `node tools/verify_live.cjs --shots 出力先` で公開サイトを実際に開いて確認します。
+  GitHub の「成功」表示は配置が終わったことしか示さないので、画面が正しいかは別に確かめます。
+
 ## せなくま美術館に絵を飾る
 
 `games/gallery/public/assets/paintings/` に絵（画像）と笑い声の音声を置き、
